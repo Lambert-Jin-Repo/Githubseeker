@@ -4,7 +4,7 @@
 **Approach:** Vertical Slice (end-to-end thin path first, then widen)
 **Auth model:** Anonymous only (session UUID in cookie)
 **Supabase:** Existing project (credentials provided)
-**Anthropic:** API key with web_search + web_fetch tool access
+**AI Provider:** MiniMax M2.5 API + Brave Search API (custom tool calling)
 
 ---
 
@@ -14,7 +14,7 @@
 - **Framework:** Next.js 15 App Router, TypeScript strict, Tailwind CSS, shadcn/ui
 - **State:** Zustand
 - **Streaming:** SSE (Server-Sent Events) via Next.js API routes
-- **AI:** Claude Sonnet via Anthropic API with web_search/web_fetch tools
+- **AI:** MiniMax M2.5 via OpenAI-compatible API with custom tool definitions (web_search → Brave Search, web_fetch → server-side fetch)
 - **Database:** Supabase PostgreSQL with RLS
 - **Auth (v1.0):** Anonymous — UUID generated on first visit, stored in cookie
 - **Deployment:** Vercel
@@ -65,11 +65,11 @@
 
 ### SSE Streaming Flow
 ```
-Client (EventSource) <-- SSE <-- Next.js API Route <-- Claude API (streaming)
+Client (EventSource) <-- SSE <-- Next.js API Route <-- MiniMax M2.5 (agentic loop)
                                         |
-                                        +-- Parse tool_use blocks
-                                        +-- Execute verification steps
-                                        +-- Format as SSE events
+                                        +-- M2.5 calls web_search → routed to Brave Search API
+                                        +-- M2.5 calls web_fetch → routed to server-side fetch
+                                        +-- Parse tool results, emit SSE events
                                         +-- Write to Supabase (async)
 ```
 
@@ -79,11 +79,15 @@ Client (EventSource) <-- SSE <-- Next.js API Route <-- Claude API (streaming)
 - Pass as `user_id` to all Supabase queries
 - RLS policies enforce per-session isolation
 
-### Claude API Integration
+### MiniMax M2.5 Integration
+- OpenAI-compatible API (uses `openai` npm package with custom baseURL)
+- Custom tool definitions: `web_search` (→ Brave Search API), `web_fetch` (→ server-side fetch)
+- Agentic loop: LLM calls tools → we execute → feed results back → repeat until done
 - System prompt: GitHub Scout skill content
 - Phase 1: web_search tool for discovery + verification
 - Phase 2: web_search + web_fetch for deep analysis
-- Streaming enabled for real-time UI updates
+- M2.5 interleaved thinking: reasons between tool calls for better planning
+- ~10x cheaper per search vs Claude Sonnet (~$0.05 vs $0.50)
 - Anti-hallucination rules enforced at API route level (not just in prompt)
 
 ### Verification Pipeline
@@ -106,7 +110,8 @@ app/api/scout/[id]/deep-dive/route.ts  # Phase 2 SSE endpoint
 app/api/feedback/route.ts              # Feedback submission
 app/api/search/history/route.ts        # History retrieval
 lib/types.ts                           # All TypeScript interfaces
-lib/claude.ts                          # Claude API client
+lib/llm.ts                             # MiniMax M2.5 client + agentic tool loop
+lib/brave-search.ts                    # Brave Search API + web fetch
 stores/scout-store.ts                  # Zustand store
 hooks/useScoutStream.ts                # Phase 1 SSE hook
 hooks/useDeepDiveStream.ts             # Phase 2 SSE hook

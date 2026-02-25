@@ -2,11 +2,11 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Build an AI-powered repository intelligence platform that discovers, verifies, and analyzes GitHub repos via Claude API with streaming results.
+**Goal:** Build an AI-powered repository intelligence platform that discovers, verifies, and analyzes GitHub repos via MiniMax M2.5 + Brave Search with streaming results.
 
-**Architecture:** Next.js 15 App Router with SSE streaming from API routes that call Claude API. Supabase for persistence. Zustand for client state. Two-phase workflow: Phase 1 (discovery + quick scan table) and Phase 2 (deep dive analysis cards).
+**Architecture:** Next.js 15 App Router with SSE streaming from API routes that call MiniMax M2.5 API with custom tool definitions (Brave Search for web search, fetch for web content). Supabase for persistence. Zustand for client state. Two-phase workflow: Phase 1 (discovery + quick scan table) and Phase 2 (deep dive analysis cards).
 
-**Tech Stack:** Next.js 15, TypeScript, Tailwind CSS, shadcn/ui, Zustand, Supabase, Anthropic Claude API (Sonnet), Vitest
+**Tech Stack:** Next.js 15, TypeScript, Tailwind CSS, shadcn/ui, Zustand, Supabase, MiniMax M2.5 API (via OpenAI-compatible SDK), Brave Search API, Vitest
 
 ---
 
@@ -28,7 +28,7 @@ Move contents from `github-scout/` up to the project root if needed.
 
 Run:
 ```bash
-npm install @supabase/supabase-js zustand @anthropic-ai/sdk uuid
+npm install @supabase/supabase-js zustand openai uuid
 npm install -D vitest @testing-library/react @testing-library/jest-dom jsdom @types/uuid
 ```
 
@@ -52,7 +52,8 @@ npx shadcn@latest add button input badge table card checkbox tooltip skeleton ta
 NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=xxx
 SUPABASE_SERVICE_ROLE_KEY=xxx
-ANTHROPIC_API_KEY=xxx
+MINIMAX_API_KEY=xxx
+BRAVE_SEARCH_API_KEY=xxx
 ```
 
 Copy to `.env.local` and fill in real values.
@@ -1033,44 +1034,184 @@ git commit -m "feat: add home page with search input and mode detection"
 ## Task 10: Phase 1 API Route (POST /api/scout)
 
 **Files:**
-- Create: `app/api/scout/route.ts`, `lib/claude.ts`
+- Create: `app/api/scout/route.ts`, `lib/llm.ts`, `lib/brave-search.ts`
 
-**Step 1: Create Claude API client**
+**Step 1: Create Brave Search client**
 
-Create `lib/claude.ts`:
+Create `lib/brave-search.ts`:
 ```typescript
-import Anthropic from "@anthropic-ai/sdk";
+const BRAVE_API_URL = "https://api.search.brave.com/res/v1/web/search";
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
-
-export interface ClaudeStreamCallbacks {
-  onText: (text: string) => void;
-  onToolUse: (toolName: string, input: Record<string, unknown>) => void;
-  onToolResult: (toolUseId: string, content: string) => void;
-  onComplete: () => void;
-  onError: (error: Error) => void;
+export interface BraveSearchResult {
+  title: string;
+  url: string;
+  description: string;
 }
 
-export async function callClaudeStreaming(
-  systemPrompt: string,
-  userMessage: string,
-  tools: Anthropic.Messages.Tool[],
-): Promise<Anthropic.Messages.Message> {
-  return anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 16384,
-    system: systemPrompt,
-    tools,
-    messages: [{ role: "user", content: userMessage }],
+export async function braveSearch(query: string, count: number = 10): Promise<BraveSearchResult[]> {
+  const response = await fetch(
+    `${BRAVE_API_URL}?q=${encodeURIComponent(query)}&count=${count}`,
+    {
+      headers: {
+        "Accept": "application/json",
+        "Accept-Encoding": "gzip",
+        "X-Subscription-Token": process.env.BRAVE_SEARCH_API_KEY!,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Brave Search API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return (data.web?.results || []).map((r: any) => ({
+    title: r.title,
+    url: r.url,
+    description: r.description,
+  }));
+}
+
+export async function fetchWebPage(url: string): Promise<string> {
+  const response = await fetch(url, {
+    headers: { "User-Agent": "GitHubScout/1.0" },
+    signal: AbortSignal.timeout(10000),
   });
+  if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
+  const html = await response.text();
+  // Return first 50k chars to stay within context limits
+  return html.slice(0, 50000);
 }
-
-export { anthropic };
 ```
 
-**Step 2: Create the API route**
+**Step 2: Create MiniMax LLM client (OpenAI-compatible)**
+
+Create `lib/llm.ts`:
+```typescript
+import OpenAI from "openai";
+import type { ChatCompletionTool } from "openai/resources/chat/completions";
+import { braveSearch, fetchWebPage } from "./brave-search";
+
+const client = new OpenAI({
+  apiKey: process.env.MINIMAX_API_KEY!,
+  baseURL: "https://api.minimax.chat/v1",
+});
+
+// Tool definitions for MiniMax to call
+const SCOUT_TOOLS: ChatCompletionTool[] = [
+  {
+    type: "function",
+    function: {
+      name: "web_search",
+      description: "Search the web for information. Use for discovering GitHub repos, checking Reddit, finding articles.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "The search query" },
+          count: { type: "number", description: "Number of results (default 10)" },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "web_fetch",
+      description: "Fetch the content of a web page. Use for verifying GitHub repos exist and extracting metadata.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: { type: "string", description: "The URL to fetch" },
+        },
+        required: ["url"],
+      },
+    },
+  },
+];
+
+// Execute tool calls by routing to real implementations
+async function executeToolCall(
+  name: string,
+  args: Record<string, unknown>
+): Promise<string> {
+  switch (name) {
+    case "web_search": {
+      const results = await braveSearch(
+        args.query as string,
+        (args.count as number) || 10
+      );
+      return JSON.stringify(results);
+    }
+    case "web_fetch": {
+      const content = await fetchWebPage(args.url as string);
+      return content;
+    }
+    default:
+      return JSON.stringify({ error: `Unknown tool: ${name}` });
+  }
+}
+
+export interface LLMCallOptions {
+  systemPrompt: string;
+  userMessage: string;
+  onToolCall?: (toolName: string, args: Record<string, unknown>) => void;
+  onToolResult?: (toolName: string, result: string) => void;
+  maxToolRounds?: number;
+}
+
+// Agentic loop: call LLM → execute tools → feed results back → repeat
+export async function callLLMWithTools(options: LLMCallOptions): Promise<string> {
+  const { systemPrompt, userMessage, onToolCall, onToolResult, maxToolRounds = 10 } = options;
+
+  const messages: OpenAI.ChatCompletionMessageParam[] = [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: userMessage },
+  ];
+
+  for (let round = 0; round < maxToolRounds; round++) {
+    const response = await client.chat.completions.create({
+      model: "MiniMax-M2.5",
+      max_tokens: 16384,
+      messages,
+      tools: SCOUT_TOOLS,
+      tool_choice: "auto",
+    });
+
+    const choice = response.choices[0];
+    const message = choice.message;
+    messages.push(message);
+
+    // If no tool calls, we're done — return the text response
+    if (!message.tool_calls || message.tool_calls.length === 0) {
+      return message.content || "";
+    }
+
+    // Execute all tool calls and feed results back
+    for (const toolCall of message.tool_calls) {
+      const args = JSON.parse(toolCall.function.arguments);
+      onToolCall?.(toolCall.function.name, args);
+
+      const result = await executeToolCall(toolCall.function.name, args);
+      onToolResult?.(toolCall.function.name, result);
+
+      messages.push({
+        role: "tool",
+        tool_call_id: toolCall.id,
+        content: result,
+      });
+    }
+  }
+
+  // If we hit max rounds, return whatever we have
+  const lastAssistant = messages.filter((m) => m.role === "assistant").pop();
+  return (lastAssistant as any)?.content || "";
+}
+
+export { client, SCOUT_TOOLS };
+```
+
+**Step 3: Create the API route**
 
 Create `app/api/scout/route.ts`:
 - Accepts `ScoutRequest` JSON body
@@ -1078,20 +1219,23 @@ Create `app/api/scout/route.ts`:
 - Auto-detects mode if not provided (server-side confirmation)
 - Generates search UUID, creates `searches` row in Supabase
 - Constructs Phase 1 prompt from PRD template (lines 411-436)
-- Calls Claude API with `web_search` tool enabled
-- Parses response: extracts repo data, verification info, observations
-- Writes SSE events to response stream using `TransformStream`
+- Calls `callLLMWithTools` with tool callbacks that emit SSE events:
+  - `onToolCall("web_search", ...)` → emit `search_progress` event
+  - `onToolResult("web_search", ...)` → parse results, emit `repo_discovered` events
+  - `onToolCall("web_fetch", ...)` → emit `verification_update` events
+- Parses final response: extracts observations, quality tiers
 - On completion: saves results to `search_results` table, emits `phase1_complete`
-- Error handling: catch Claude API errors, emit `error` SSE event
+- Error handling: catch API errors, emit `error` SSE event
 
 SSE format:
 ```
 event: mode_detected\ndata: {"mode":"BUILD","topic":"AI agent frameworks","confidence":0.92}\n\n
+event: search_progress\ndata: {"strategy":"high_star","status":"complete","repos_found":8}\n\n
 event: repo_discovered\ndata: {...repo JSON...}\n\n
 event: phase1_complete\ndata: {"total_repos":22,"verified":20,"unverified":2}\n\n
 ```
 
-**Step 3: Test manually**
+**Step 4: Test manually**
 
 Run: `npm run dev`
 Test with curl:
@@ -1102,11 +1246,11 @@ curl -N -X POST http://localhost:3000/api/scout \
 ```
 Expected: SSE events streaming back.
 
-**Step 4: Commit**
+**Step 5: Commit**
 
 ```bash
-git add app/api/scout/route.ts lib/claude.ts
-git commit -m "feat: add Phase 1 search API route with Claude streaming"
+git add app/api/scout/route.ts lib/llm.ts lib/brave-search.ts
+git commit -m "feat: add Phase 1 search API with MiniMax M2.5 + Brave Search"
 ```
 
 ---
@@ -1306,7 +1450,7 @@ git commit -m "feat: add results page with streaming table and badges"
 - Accept `{ repo_urls: string[] }` (validate: max 5, must belong to search)
 - For each repo URL **sequentially**:
   - Construct Phase 2 prompt from PRD template (lines 439-452)
-  - Call Claude API with `web_search` + `web_fetch` tools
+  - Call `callLLMWithTools` (MiniMax M2.5) with `web_search` + `web_fetch` custom tools
   - Parse response into `DeepDiveResult` sections
   - Extract AI patterns (check for: anthropic, openai, langchain, llamaindex, cursor rules, MCP, etc.)
   - Emit `deep_dive_start`, `deep_dive_section`, `deep_dive_complete` SSE events
