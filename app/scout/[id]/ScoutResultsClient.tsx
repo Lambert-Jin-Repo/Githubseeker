@@ -1,6 +1,8 @@
 "use client";
 
+import { useRef } from "react";
 import { useScoutStream } from "@/hooks/useScoutStream";
+import { useDeepDiveStream } from "@/hooks/useDeepDiveStream";
 import { useScoutStore } from "@/stores/scout-store";
 import { Header } from "@/components/shared/Header";
 import { SearchMetaBar } from "@/components/results/SearchMetaBar";
@@ -10,6 +12,8 @@ import { ObservationsPanel } from "@/components/results/ObservationsPanel";
 import { CuratedListsSection } from "@/components/results/CuratedListsSection";
 import { IndustryToolsSection } from "@/components/results/IndustryToolsSection";
 import { DeepDiveCTA } from "@/components/results/DeepDiveCTA";
+import { DeepDiveCard } from "@/components/deep-dive/DeepDiveCard";
+import { SummaryPanel } from "@/components/deep-dive/SummaryPanel";
 import { AlertCircle } from "lucide-react";
 
 interface ScoutResultsClientProps {
@@ -17,11 +21,26 @@ interface ScoutResultsClientProps {
 }
 
 export function ScoutResultsClient({ searchId }: ScoutResultsClientProps) {
-  const { isConnected, isComplete, error } = useScoutStream(searchId);
-  const phase1Complete = useScoutStore((s) => s.phase1Complete);
-  const repos = useScoutStore((s) => s.repos);
+  const { error } = useScoutStream(searchId);
+  const { startDeepDive, isStreaming: isDeepDiving, progress, error: deepDiveError } = useDeepDiveStream(searchId);
+  const deepDiveRef = useRef<HTMLDivElement>(null);
+
   const curatedLists = useScoutStore((s) => s.curatedLists);
   const industryTools = useScoutStore((s) => s.industryTools);
+  const mode = useScoutStore((s) => s.mode);
+  const selectedRepoUrls = useScoutStore((s) => s.selectedRepoUrls);
+  const deepDiveResults = useScoutStore((s) => s.deepDiveResults);
+  const summary = useScoutStore((s) => s.summary);
+  const phase2Complete = useScoutStore((s) => s.phase2Complete);
+
+  const handleDeepDive = () => {
+    startDeepDive(selectedRepoUrls);
+    setTimeout(() => {
+      deepDiveRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 300);
+  };
+
+  const activeError = error || deepDiveError;
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -30,10 +49,10 @@ export function ScoutResultsClient({ searchId }: ScoutResultsClientProps) {
 
       <main className="mx-auto max-w-6xl px-6 py-6 space-y-8">
         {/* Error banner */}
-        {error && (
+        {activeError && (
           <div className="animate-slide-up flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
             <AlertCircle className="size-4 shrink-0" />
-            {error}
+            {activeError}
           </div>
         )}
 
@@ -54,10 +73,37 @@ export function ScoutResultsClient({ searchId }: ScoutResultsClientProps) {
             {industryTools.length > 0 && <IndustryToolsSection />}
           </aside>
         </div>
+
+        {/* Deep Dive Results */}
+        {deepDiveResults.length > 0 && (
+          <div ref={deepDiveRef} className="space-y-6 pt-4">
+            <h2 className="font-serif text-3xl text-foreground">
+              Deep Dive Analysis
+            </h2>
+            {isDeepDiving && progress.total > 0 && (
+              <p className="text-sm text-muted-foreground">
+                Analyzing {progress.completed} of {progress.total} repositories...
+              </p>
+            )}
+            {deepDiveResults.map((result, index) => (
+              <DeepDiveCard
+                key={result.repo_url}
+                result={result}
+                mode={mode || "SCOUT"}
+                index={index}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Summary Panel */}
+        {summary && phase2Complete && (
+          <SummaryPanel summary={summary} mode={mode || "SCOUT"} />
+        )}
       </main>
 
       {/* Sticky bottom CTA */}
-      <DeepDiveCTA />
+      <DeepDiveCTA onDeepDive={handleDeepDive} />
     </div>
   );
 }

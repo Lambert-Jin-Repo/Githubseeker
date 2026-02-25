@@ -5,7 +5,11 @@ import { Button } from "@/components/ui/button";
 import { useScoutStore } from "@/stores/scout-store";
 import { cn } from "@/lib/utils";
 
-export function DeepDiveCTA() {
+interface DeepDiveCTAProps {
+  onDeepDive?: () => void;
+}
+
+export function DeepDiveCTA({ onDeepDive }: DeepDiveCTAProps) {
   const phase1Complete = useScoutStore((s) => s.phase1Complete);
   const selectedRepoUrls = useScoutStore((s) => s.selectedRepoUrls);
   const isDeepDiving = useScoutStore((s) => s.isDeepDiving);
@@ -34,6 +38,7 @@ export function DeepDiveCTA() {
 
         <Button
           disabled={!isEnabled}
+          onClick={onDeepDive}
           className={cn(
             "gap-2 px-6 font-medium transition-all",
             isEnabled
