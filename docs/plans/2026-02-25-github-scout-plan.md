@@ -50,8 +50,8 @@ npx shadcn@latest add button input badge table card checkbox tooltip skeleton ta
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=xxx
-SUPABASE_SERVICE_ROLE_KEY=xxx
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=xxx
+SUPABASE_SECRET_KEY=xxx
 MINIMAX_API_KEY=xxx
 BRAVE_SEARCH_API_KEY=xxx
 ```
@@ -341,14 +341,14 @@ Create `lib/supabase.ts`:
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
 
 // Client-side Supabase client (uses anon key)
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabasePublishableKey);
 
 // Server-side Supabase client (uses service role key, sets user context for RLS)
 export function createServerClient(userId: string) {
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  const serviceRoleKey = process.env.SUPABASE_SECRET_KEY!;
   const client = createClient(supabaseUrl, serviceRoleKey, {
     global: {
       headers: {
@@ -361,7 +361,7 @@ export function createServerClient(userId: string) {
 
 // Helper to set RLS context before queries
 export async function withUserContext(userId: string) {
-  const client = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+  const client = createClient(supabaseUrl, process.env.SUPABASE_SECRET_KEY!);
   await client.rpc("set_config", { setting: "app.user_id", value: userId });
   return client;
 }
