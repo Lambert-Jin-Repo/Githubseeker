@@ -50,6 +50,25 @@
 
 ---
 
+## Phase 6: Search Performance Optimization (COMPLETE)
+
+**Completed:** 2026-02-26
+
+| # | Task | Status | Files |
+|---|---|---|---|
+| 1 | Parallelize tool calls — `Promise.allSettled` in LLM loop | `done` | `lib/llm.ts` |
+| 2 | GitHub metadata extraction — regex-based `fetchGitHubMetadata()` (~300B vs 50KB) | `done` | `lib/web-search.ts` |
+| 3 | Route `web_fetch` for GitHub repo URLs through metadata extractor | `done` | `lib/llm.ts` |
+| 4 | Streamline system prompt — 4 strategies (was 6), verify top 5-8 (was all), remove Reddit | `done` | `app/api/scout/route.ts` |
+| 5 | Lower maxToolRounds 12 → 8 | `done` | `app/api/scout/route.ts` |
+| 6 | Tests — 10 llm.test.ts + 6 web-search.test.ts | `done` | `lib/__tests__/llm.test.ts`, `lib/__tests__/web-search.test.ts` |
+
+**Commits:** `3daeda7` perf: parallelize tool calls, add GitHub metadata extraction, streamline prompt
+
+**Expected impact:** Phase 1 search 25-50s (was 60-120s), ~5-7 tool rounds (was ~12), ~2KB context per repo (was 50KB HTML)
+
+---
+
 ## Tests
 
-46/46 passing (8 test files), TypeScript compiles clean
+77/77 passing (12 test files), TypeScript compiles clean
