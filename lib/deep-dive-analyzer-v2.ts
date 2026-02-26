@@ -3,6 +3,7 @@ import { fetchRepoData } from "@/lib/repo-data-fetcher";
 import type { RawRepoData } from "@/lib/repo-data-fetcher";
 import { createServerClient } from "@/lib/supabase";
 import { extractJSON } from "@/lib/deep-dive-analyzer";
+import { webSearch, fetchWebPage } from "@/lib/web-search";
 import type {
   DeepDiveResultV2,
   EnhancedSection,
@@ -14,6 +15,7 @@ import type {
   AIPatterns,
   SourceLink,
   ScoutSummaryV2,
+  AgentEcosystemDiscovery,
 } from "@/lib/types";
 
 // ── Prompt builders ──────────────────────────────────────────────
@@ -126,7 +128,7 @@ Return a JSON object with EXACTLY these keys (no markdown fences, no extra text)
   };
 }
 
-function buildGroupCPrompt(data: RawRepoData): { systemPrompt: string; userMessage: string } {
+function buildGroupCPrompt(data: RawRepoData, ecosystemContext?: string): { systemPrompt: string; userMessage: string } {
   const context = buildDataContext(data);
   return {
     systemPrompt: `You are GitHub Scout's Deep Dive analyzer (Group C). Analyze the provided repository data and output ONLY the sections assigned to you.
@@ -137,7 +139,13 @@ AI Pattern indicators to look for:
 - Dependencies: openai, anthropic, langchain, llamaindex, crewai, autogen, google-generativeai
 - Files: .cursorrules, .claude, mcp.json, skills.yaml
 - Directories: .cursor/, .claude/, skills/, mcp/, agents/, prompts/
+${ecosystemContext ? `
+AGENT ECOSYSTEM DATA (from web search — these are REAL files found on GitHub for this repo):
+${ecosystemContext}
 
+Use this real data to populate the "agent_ecosystem" field. Report what was ACTUALLY FOUND, not guesses.
+If no agent files were found, set discovered_files to empty array and has_config/has_skills to false.
+` : ""}
 Return a JSON object with EXACTLY these keys (no markdown fences, no extra text):
 {
   "ai_patterns": {
@@ -149,9 +157,20 @@ Return a JSON object with EXACTLY these keys (no markdown fences, no extra text)
   "skills_required": {
     "technical": ["..."], "design": ["..."], "domain": ["..."]
   },
-  "mode_specific": { "title": "Key Insights", "content": "...", "confidence": "...", "sources": [...] }
+  "mode_specific": { "title": "Key Insights", "content": "...", "confidence": "...", "sources": [...] },
+  "agent_ecosystem": {
+    "discovered_files": [{"type": "cursorrules"|"mcp_config"|"claude_skills"|"agents_config"|"other", "path": "...", "url": "https://...", "summary": "..."}],
+    "ecosystem_mapping": {
+      "cursor": {"has_config": true|false, "rules_count": 0},
+      "claude": {"has_skills": true|false, "has_mcp": true|false},
+      "other_agents": ["..."]
+    },
+    "trending_tools": [{"name": "...", "relevance": "...", "url": "..."}],
+    "confidence": "high"|"medium"|"low",
+    "sources": [...]
+  }
 }`,
-    userMessage: `Analyze this repository data and extract: AI Patterns, Skills Required, and Mode-Specific Insights.\n\n${context}`,
+    userMessage: `Analyze this repository data and extract: AI Patterns, Skills Required, Mode-Specific Insights, and Agent Ecosystem.\n\n${context}`,
   };
 }
 
@@ -326,6 +345,59 @@ function parseAIPatternsV2(raw: unknown): AIPatterns & { sources: SourceLink[] }
   };
 }
 
+function parseAgentEcosystem(raw: unknown): AgentEcosystemDiscovery {
+  const empty: AgentEcosystemDiscovery = {
+    discovered_files: [],
+    ecosystem_mapping: { cursor: { has_config: false, rules_count: 0 }, claude: { has_skills: false, has_mcp: false }, other_agents: [] },
+    trending_tools: [],
+    confidence: "low",
+    sources: [],
+  };
+  if (!raw || typeof raw !== "object") return empty;
+  const obj = raw as Record<string, unknown>;
+
+  const eco = obj.ecosystem_mapping as Record<string, unknown> | undefined;
+  const cursor = eco?.cursor as Record<string, unknown> | undefined;
+  const claude = eco?.claude as Record<string, unknown> | undefined;
+
+  return {
+    discovered_files: Array.isArray(obj.discovered_files)
+      ? obj.discovered_files
+          .filter((f): f is Record<string, unknown> => f && typeof f === "object")
+          .map((f) => ({
+            type: (["cursorrules", "mcp_config", "claude_skills", "agents_config", "other"].includes(f.type as string)
+              ? f.type : "other") as AgentEcosystemDiscovery["discovered_files"][number]["type"],
+            path: typeof f.path === "string" ? f.path : "",
+            url: typeof f.url === "string" ? f.url : "",
+            summary: typeof f.summary === "string" ? f.summary : "",
+          }))
+      : [],
+    ecosystem_mapping: {
+      cursor: {
+        has_config: cursor?.has_config === true,
+        rules_count: typeof cursor?.rules_count === "number" ? cursor.rules_count : 0,
+      },
+      claude: {
+        has_skills: claude?.has_skills === true,
+        has_mcp: claude?.has_mcp === true,
+      },
+      other_agents: eco ? parseStringArray(eco.other_agents) : [],
+    },
+    trending_tools: Array.isArray(obj.trending_tools)
+      ? obj.trending_tools
+          .filter((t): t is Record<string, unknown> => t && typeof t === "object")
+          .map((t) => ({
+            name: typeof t.name === "string" ? t.name : "",
+            relevance: typeof t.relevance === "string" ? t.relevance : "",
+            url: typeof t.url === "string" ? t.url : undefined,
+          }))
+          .filter((t) => t.name)
+      : [],
+    confidence: parseConfidence(obj.confidence),
+    sources: parseSources(obj.sources),
+  };
+}
+
 function parseStringArray(raw: unknown): string[] {
   return Array.isArray(raw) ? raw.filter((s): s is string => typeof s === "string") : [];
 }
@@ -352,9 +424,96 @@ export function buildFallbackResultV2(repoUrl: string): DeepDiveResultV2 {
     security_posture: { has_security_policy: false, has_env_example: false, env_vars_documented: false, license_type: "Unknown", license_commercial_friendly: false, known_vulnerabilities_mentioned: false, auth_patterns: [], confidence: "low", sources: [] },
     ai_patterns: { has_ai_components: false, sdks_detected: [], agent_architecture: null, skill_files: [], mcp_usage: false, prompt_engineering: { has_system_prompts: false, has_few_shot: false, prompt_location: null }, confidence: "low", summary: "Could not determine AI patterns.", sources: [] },
     skills_required: { technical: [], design: [], domain: [] },
+    agent_ecosystem: { discovered_files: [], ecosystem_mapping: { cursor: { has_config: false, rules_count: 0 }, claude: { has_skills: false, has_mcp: false }, other_agents: [] }, trending_tools: [], confidence: "low", sources: [] },
     getting_started: { prerequisites: [], install_commands: [], first_run_command: null, env_setup_steps: [], common_pitfalls: [], estimated_setup_time: null, confidence: "low", sources: [] },
     mode_specific: { ...fallbackSection, title: "Key Insights" },
   };
+}
+
+// ── Agent ecosystem batch search ─────────────────────────────────
+
+interface AgentEcosystemRaw {
+  fileUrls: Array<{ type: string; url: string; path: string }>;
+  fileContents: Map<string, string>;
+  trendingResults: Array<{ title: string; url: string; description: string }>;
+}
+
+const AGENT_FILE_PATTERNS = [".cursorrules", "mcp.json", "skills.yaml", ".claude"];
+const AGENT_FILE_TYPE_MAP: Record<string, AgentEcosystemDiscovery["discovered_files"][number]["type"]> = {
+  ".cursorrules": "cursorrules",
+  "mcp.json": "mcp_config",
+  "skills.yaml": "claude_skills",
+  ".claude": "claude_skills",
+  "agents.yaml": "agents_config",
+  "agents.json": "agents_config",
+};
+
+async function batchSearchAgentEcosystem(
+  repos: Array<{ owner: string; repo: string; repoUrl: string }>,
+): Promise<Map<string, AgentEcosystemRaw>> {
+  const result = new Map<string, AgentEcosystemRaw>();
+
+  if (repos.length === 0) return result;
+
+  // Initialize entries for all repos
+  for (const r of repos) {
+    result.set(r.repoUrl, { fileUrls: [], fileContents: new Map(), trendingResults: [] });
+  }
+
+  try {
+    // Build a single Serper query for all repos
+    const repoTerms = repos
+      .slice(0, 6)
+      .map((r) => `"${r.owner}/${r.repo}"`)
+      .join(" OR ");
+    const fileTerms = AGENT_FILE_PATTERNS.map((f) => `"${f}"`).join(" OR ");
+    const query = `site:github.com (${fileTerms}) ${repoTerms}`;
+
+    const searchResults = await webSearch(query, 20);
+
+    for (const hit of searchResults) {
+      const matchedRepo = repos.find(
+        (r) => hit.url.includes(`${r.owner}/${r.repo}`)
+      );
+      if (!matchedRepo) continue;
+
+      const matchedPattern = AGENT_FILE_PATTERNS.find((p) => hit.url.includes(p) || hit.title.includes(p));
+      if (!matchedPattern) continue;
+
+      const entry = result.get(matchedRepo.repoUrl)!;
+      const pathFromUrl = hit.url.split("/blob/")[1]?.split("/").slice(1).join("/") || matchedPattern;
+      entry.fileUrls.push({
+        type: AGENT_FILE_TYPE_MAP[matchedPattern] || "other",
+        url: hit.url,
+        path: pathFromUrl,
+      });
+    }
+
+    // Fetch discovered file contents in parallel (max 5 files total)
+    const fetchPromises: Array<Promise<void>> = [];
+    for (const [, data] of result) {
+      for (const file of data.fileUrls.slice(0, 3)) {
+        const rawUrl = file.url
+          .replace("github.com", "raw.githubusercontent.com")
+          .replace("/blob/", "/");
+        fetchPromises.push(
+          fetchWebPage(rawUrl)
+            .then((content) => {
+              data.fileContents.set(file.path, content.slice(0, 3000));
+            })
+            .catch(() => {
+              // Silently skip failed fetches
+            })
+        );
+      }
+    }
+    await Promise.allSettled(fetchPromises);
+
+    return result;
+  } catch (err) {
+    console.error("[agent-ecosystem] Batch search failed:", err instanceof Error ? err.message : err);
+    return result;
+  }
 }
 
 // ── Core analysis function ───────────────────────────────────────
@@ -367,10 +526,24 @@ export async function analyzeRepoV2(
     // Phase 1: Fetch all raw data
     const data = await fetchRepoData(repoUrl);
 
+    // Phase 1.5: Batch search for agent ecosystem files
+    const repoInfo = { owner: data.owner, repo: data.repo, repoUrl };
+    const ecosystemMap = await batchSearchAgentEcosystem([repoInfo]);
+    const ecosystemData = ecosystemMap.get(repoUrl);
+    let ecosystemContext: string | undefined;
+    if (ecosystemData && ecosystemData.fileUrls.length > 0) {
+      const contextParts: string[] = [];
+      for (const file of ecosystemData.fileUrls) {
+        const content = ecosystemData.fileContents.get(file.path);
+        contextParts.push(`File: ${file.path} (${file.type})\nURL: ${file.url}${content ? `\nContent:\n${content}` : ""}`);
+      }
+      ecosystemContext = contextParts.join("\n---\n");
+    }
+
     // Phase 2: Fire 4 parallel LLM calls
     const promptA = buildGroupAPrompt(data);
     const promptB = buildGroupBPrompt(data);
-    const promptC = buildGroupCPrompt(data);
+    const promptC = buildGroupCPrompt(data, ecosystemContext);
     const promptD = buildGroupDPrompt(data);
 
     const [responseA, responseB, responseC, responseD] = await Promise.all([
@@ -432,6 +605,7 @@ export async function analyzeRepoV2(
         design: skillsReq ? parseStringArray(skillsReq.design) : [],
         domain: skillsReq ? parseStringArray(skillsReq.domain) : [],
       },
+      agent_ecosystem: parseAgentEcosystem(parsedC.agent_ecosystem),
       getting_started: parseGettingStarted(parsedD.getting_started),
       mode_specific: parseEnhancedSection(parsedC.mode_specific, "Key Insights"),
     };

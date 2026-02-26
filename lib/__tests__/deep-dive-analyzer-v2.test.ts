@@ -19,17 +19,27 @@ vi.mock("../supabase", () => ({
     }),
   }),
 }));
+vi.mock("../web-search", () => ({
+  webSearch: vi.fn(),
+  fetchWebPage: vi.fn(),
+}));
 
 import { analyzeRepoV2 } from "../deep-dive-analyzer-v2";
 import { callLLMWithTools } from "../llm";
 import { fetchRepoData } from "../repo-data-fetcher";
+import { webSearch, fetchWebPage } from "../web-search";
 
 const mockedLLM = vi.mocked(callLLMWithTools);
 const mockedFetchRepo = vi.mocked(fetchRepoData);
+const mockedWebSearch = vi.mocked(webSearch);
+const mockedFetchWebPage = vi.mocked(fetchWebPage);
 
 describe("analyzeRepoV2", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    mockedWebSearch.mockResolvedValue([]);
+    mockedFetchWebPage.mockResolvedValue("");
 
     mockedFetchRepo.mockResolvedValue({
       repoUrl: "https://github.com/test/repo",
@@ -55,6 +65,7 @@ describe("analyzeRepoV2", () => {
       security_posture: { has_security_policy: false, has_env_example: false, env_vars_documented: false, license_type: "Unknown", license_commercial_friendly: false, known_vulnerabilities_mentioned: false, auth_patterns: [], confidence: "low", sources: [] },
       ai_patterns: { has_ai_components: false, sdks_detected: [], agent_architecture: null, skill_files: [], mcp_usage: false, prompt_engineering: { has_system_prompts: false, has_few_shot: false, prompt_location: null }, confidence: "low", summary: "No AI", sources: [] },
       skills_required: { technical: [], design: [], domain: [] },
+      agent_ecosystem: { discovered_files: [], ecosystem_mapping: { cursor: { has_config: false, rules_count: 0 }, claude: { has_skills: false, has_mcp: false }, other_agents: [] }, trending_tools: [], confidence: "low", sources: [] },
       getting_started: { prerequisites: [], install_commands: [], first_run_command: null, env_setup_steps: [], common_pitfalls: [], estimated_setup_time: null, confidence: "low", sources: [] },
       mode_specific: { title: "Insights", content: "N/A", confidence: "low", sources: [] },
       stars: 500,
