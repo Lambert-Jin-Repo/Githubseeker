@@ -18,6 +18,8 @@ import { ArchitectureSection } from "./ArchitectureSection";
 import { AIPatternsSection } from "./AIPatternsSection";
 import { SkillsSection } from "./SkillsSection";
 import { ModeSpecificSection } from "./ModeSpecificSection";
+import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
+import { useScoutStore } from "@/stores/scout-store";
 import type { DeepDiveResult, DeepDiveSection, ScoutMode } from "@/lib/types";
 import { formatStarCount, formatRelativeDate } from "@/lib/verification";
 import { cn } from "@/lib/utils";
@@ -119,6 +121,7 @@ function ContentSection({ section }: { section: DeepDiveSection }) {
 }
 
 export function DeepDiveCard({ result, mode, index }: DeepDiveCardProps) {
+  const searchMeta = useScoutStore((s) => s.searchMeta);
   const delayClass = index < 8 ? `delay-${index + 1}` : undefined;
 
   return (
@@ -196,6 +199,14 @@ export function DeepDiveCard({ result, mode, index }: DeepDiveCardProps) {
               </div>
             )}
           </div>
+
+          {/* Feedback */}
+          {searchMeta && (
+            <FeedbackWidget
+              searchId={searchMeta.id}
+              repoUrl={result.repo_url}
+            />
+          )}
         </div>
       </CardHeader>
 

@@ -7,6 +7,7 @@ import { TableRow, TableCell } from "@/components/ui/table";
 import { VerificationBadge } from "./VerificationBadge";
 import { QualityTierBadge } from "./QualityTierBadge";
 import { RedditSignalBadge } from "./RedditSignalBadge";
+import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
 import type { RepoResult } from "@/lib/types";
 import { formatStarCount, formatRelativeDate } from "@/lib/verification";
 import { useScoutStore } from "@/stores/scout-store";
@@ -45,6 +46,7 @@ export function RepoRow({ repo, index }: RepoRowProps) {
   const [expanded, setExpanded] = useState(false);
   const toggleRepoSelection = useScoutStore((s) => s.toggleRepoSelection);
   const selectedRepoUrls = useScoutStore((s) => s.selectedRepoUrls);
+  const searchMeta = useScoutStore((s) => s.searchMeta);
 
   const isSelected = selectedRepoUrls.includes(repo.repo_url);
   const isMaxSelected = selectedRepoUrls.length >= 5 && !isSelected;
@@ -192,6 +194,15 @@ export function RepoRow({ repo, index }: RepoRowProps) {
                   </span>
                 )}
               </div>
+
+              {searchMeta && (
+                <div className="pt-2">
+                  <FeedbackWidget
+                    searchId={searchMeta.id}
+                    repoUrl={repo.repo_url}
+                  />
+                </div>
+              )}
             </div>
           </TableCell>
         </TableRow>
