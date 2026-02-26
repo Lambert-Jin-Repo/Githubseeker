@@ -14,6 +14,7 @@ import { IndustryToolsSection } from "@/components/results/IndustryToolsSection"
 import { DeepDiveCTA } from "@/components/results/DeepDiveCTA";
 import { DeepDiveCard } from "@/components/deep-dive/DeepDiveCard";
 import { SummaryPanel } from "@/components/deep-dive/SummaryPanel";
+import { ExportButton } from "@/components/export/ExportButton";
 import { AlertCircle } from "lucide-react";
 
 interface ScoutResultsClientProps {
@@ -25,6 +26,9 @@ export function ScoutResultsClient({ searchId }: ScoutResultsClientProps) {
   const { startDeepDive, isStreaming: isDeepDiving, progress, error: deepDiveError } = useDeepDiveStream(searchId);
   const deepDiveRef = useRef<HTMLDivElement>(null);
 
+  const repos = useScoutStore((s) => s.repos);
+  const searchMeta = useScoutStore((s) => s.searchMeta);
+  const phase1Complete = useScoutStore((s) => s.phase1Complete);
   const curatedLists = useScoutStore((s) => s.curatedLists);
   const industryTools = useScoutStore((s) => s.industryTools);
   const mode = useScoutStore((s) => s.mode);
@@ -58,6 +62,17 @@ export function ScoutResultsClient({ searchId }: ScoutResultsClientProps) {
 
         {/* Streaming progress */}
         <StreamingProgress />
+
+        {/* Export button — visible after Phase 1 completes */}
+        {phase1Complete && repos.length > 0 && (
+          <div className="flex justify-end">
+            <ExportButton
+              repos={repos}
+              deepDiveResults={deepDiveResults.length > 0 ? deepDiveResults : undefined}
+              query={searchMeta?.query || ""}
+            />
+          </div>
+        )}
 
         {/* Main content grid */}
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_320px]">
