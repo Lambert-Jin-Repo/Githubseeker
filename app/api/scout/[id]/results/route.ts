@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabase";
+import { createServerClient, getSessionUserId } from "@/lib/supabase";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
@@ -11,13 +11,15 @@ export async function GET(
     return NextResponse.json({ error: "Missing search ID" }, { status: 400 });
   }
 
+  const userId = getSessionUserId(request);
   const db = createServerClient();
 
-  // Fetch the search record
+  // Fetch the search record (scoped to the requesting user)
   const { data: search, error: searchError } = await db
     .from("searches")
     .select("*")
     .eq("id", id)
+    .eq("user_id", userId)
     .single();
 
   if (searchError || !search) {

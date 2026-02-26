@@ -24,7 +24,8 @@ export function useScoutStream(searchId: string | null) {
           const data = await res.json();
 
           if (data.search?.phase1_complete) {
-            // Hydrate store from saved data
+            // Reset store before hydrating to prevent duplicates (React strict mode)
+            store.reset();
             store.setSearchMeta({
               id: searchId,
               query: data.search.query,

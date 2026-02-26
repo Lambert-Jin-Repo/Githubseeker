@@ -27,6 +27,10 @@ export async function GET(request: NextRequest) {
 
   // Get repo counts per search
   const searchIds = searches.map((s: { id: string }) => s.id);
+  if (searchIds.length === 0) {
+    return NextResponse.json({ items: [] });
+  }
+
   const { data: counts, error: countError } = await db
     .from("search_results")
     .select("search_id")

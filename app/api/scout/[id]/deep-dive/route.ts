@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callLLMWithTools } from "@/lib/llm";
-import { createServerClient } from "@/lib/supabase";
+import { createServerClient, getSessionUserId } from "@/lib/supabase";
 import type {
   DeepDiveResult,
   DeepDiveSection,
@@ -322,6 +322,20 @@ export async function POST(
 
   if (!id) {
     return NextResponse.json({ error: "Missing search ID" }, { status: 400 });
+  }
+
+  // Verify the search belongs to the requesting user
+  const userId = getSessionUserId(request);
+  const db = createServerClient();
+  const { data: search } = await db
+    .from("searches")
+    .select("id")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .single();
+
+  if (!search) {
+    return NextResponse.json({ error: "Search not found" }, { status: 404 });
   }
 
   let body: { repo_urls?: string[] };
