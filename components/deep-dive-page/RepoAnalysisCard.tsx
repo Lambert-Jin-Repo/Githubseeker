@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ConfidenceIndicator } from "@/components/deep-dive/ConfidenceIndicator";
 import { AIPatternsSection } from "@/components/deep-dive/AIPatternsSection";
 import { SkillsSection } from "@/components/deep-dive/SkillsSection";
+import { AgentEcosystemSection } from "@/components/deep-dive/AgentEcosystemSection";
 import { SourcesRow } from "./SourcesRow";
 import { EnhancedSectionDisplay } from "./sections/EnhancedSectionDisplay";
 import { TechStackSectionV2 } from "./sections/TechStackSectionV2";
@@ -206,6 +207,13 @@ export function RepoAnalysisCard({
         <div className="py-5">
           <SkillsSection skills={result.skills_required} />
         </div>
+
+        {/* 10b. Agent Ecosystem */}
+        {result.agent_ecosystem && (
+          <div className="py-5">
+            <AgentEcosystemSection ecosystem={result.agent_ecosystem} />
+          </div>
+        )}
 
         {/* 11. Getting Started */}
         <div className="py-5">
