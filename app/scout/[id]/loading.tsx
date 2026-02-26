@@ -5,7 +5,7 @@ export default function ScoutResultsLoading() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header skeleton */}
-      <div className="sticky top-0 z-50 border-b border-border/60 bg-white/80 backdrop-blur-md">
+      <div className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <Skeleton className="h-6 w-20" />
           <Skeleton className="h-4 w-16" />
@@ -13,7 +13,7 @@ export default function ScoutResultsLoading() {
       </div>
 
       {/* Meta bar skeleton */}
-      <div className="sticky top-16 z-40 border-b border-border/60 bg-white/90 backdrop-blur-md">
+      <div className="sticky top-16 z-40 border-b border-border/60 bg-background/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-6 py-3">
           <Skeleton className="h-6 w-16 rounded-full" />
           <Skeleton className="h-5 w-48" />

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
 import { GlobalSearchStreamListener } from "@/components/shared/GlobalSearchStreamListener";
 import { MouseTracker } from "@/components/shared/MouseTracker";
@@ -16,15 +17,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className="min-h-screen antialiased">
-        <MouseTracker />
-        <GlobalSearchStreamListener />
-        <div className="relative flex min-h-screen flex-col z-10">
-          {children}
-        </div>
-        <Toaster position="bottom-right" richColors />
+    <html lang="en" suppressHydrationWarning>
+      <body className="min-h-screen antialiased" suppressHydrationWarning>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <MouseTracker />
+          <GlobalSearchStreamListener />
+          <div className="relative flex min-h-screen flex-col z-10">
+            {children}
+          </div>
+          <Toaster position="bottom-right" richColors />
+        </ThemeProvider>
       </body>
     </html>
   );
 }
+

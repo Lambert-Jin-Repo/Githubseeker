@@ -96,7 +96,7 @@ export function ExecutiveSummary({ summary, mode }: ExecutiveSummaryProps) {
                       "absolute -left-8 mt-0.5 flex size-[22px] shrink-0 items-center justify-center rounded-full border-2",
                       idx === 0
                         ? "border-teal bg-teal text-white"
-                        : "border-teal/30 bg-white text-teal/60"
+                        : "border-teal/30 bg-card text-teal/60"
                     )}
                   >
                     <span className="text-[10px] font-bold">{item.step}</span>

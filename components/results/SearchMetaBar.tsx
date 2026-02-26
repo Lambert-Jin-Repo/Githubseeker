@@ -39,7 +39,7 @@ export function SearchMetaBar() {
   const topic = searchMeta?.topic_extracted ?? searchMeta?.query ?? "";
 
   return (
-    <div className="sticky top-16 z-40 border-b border-border/60 bg-white/90 backdrop-blur-md">
+    <div className="sticky top-16 z-40 border-b border-border/60 bg-background/90 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-4 sm:px-6">
         <div className="flex items-center gap-3 min-w-0">
           {currentMode && (

@@ -125,7 +125,7 @@ export function SummaryPanel({ summary, mode }: SummaryPanelProps) {
                           "absolute -left-6 mt-1 flex size-[18px] shrink-0 items-center justify-center rounded-full border-2",
                           idx === 0
                             ? "border-teal bg-teal text-white"
-                            : "border-teal/30 bg-white text-teal/60"
+                            : "border-teal/30 bg-card text-teal/60"
                         )}
                       >
                         <span className="text-[9px] font-bold">

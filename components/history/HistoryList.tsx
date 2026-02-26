@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, Hammer, Compass, Search } from "lucide-react";
+import Link from "next/link";
+import { BookOpen, Hammer, Compass, Search, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { ErrorBoundaryCard } from "@/components/shared/ErrorBoundaryCard";
 import { cn } from "@/lib/utils";
 import type { SearchHistoryItem, ScoutMode } from "@/lib/types";
 
@@ -14,17 +16,17 @@ const MODE_CONFIG: Record<
   LEARN: {
     icon: BookOpen,
     label: "Learn",
-    color: "text-blue-600 bg-blue-50 border-blue-200",
+    color: "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20",
   },
   BUILD: {
     icon: Hammer,
     label: "Build",
-    color: "text-emerald-700 bg-emerald-50 border-emerald-200",
+    color: "text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20",
   },
   SCOUT: {
     icon: Compass,
     label: "Scout",
-    color: "text-amber-700 bg-amber-50 border-amber-200",
+    color: "text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20",
   },
 };
 
@@ -52,24 +54,26 @@ export function HistoryList() {
   const router = useRouter();
   const [items, setItems] = useState<SearchHistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  const fetchHistory = useCallback(async () => {
+    setIsLoading(true);
+    setError(false);
+    try {
+      const res = await fetch("/api/history");
+      if (!res.ok) throw new Error("Failed to fetch");
+      const data = await res.json();
+      setItems(data.items ?? []);
+    } catch {
+      setError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    async function fetchHistory() {
-      try {
-        const res = await fetch("/api/history");
-        if (res.ok) {
-          const data = await res.json();
-          setItems(data.items ?? []);
-        }
-      } catch {
-        // Silently fail; empty state handles it
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
     fetchHistory();
-  }, []);
+  }, [fetchHistory]);
 
   if (isLoading) {
     return (
@@ -84,18 +88,37 @@ export function HistoryList() {
     );
   }
 
+  if (error) {
+    return (
+      <ErrorBoundaryCard
+        title="Failed to load history"
+        message="We couldn't fetch your search history. Please try again."
+        onRetry={fetchHistory}
+      />
+    );
+  }
+
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-secondary">
-          <Search className="size-7 text-muted-foreground/50" />
+      <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
+        <div className="flex size-14 items-center justify-center rounded-full bg-teal/10">
+          <Search className="size-6 text-teal" />
         </div>
-        <h3 className="font-serif text-xl text-foreground">
-          No searches yet
-        </h3>
-        <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-          Try discovering some repos! Your search history will appear here.
-        </p>
+        <div>
+          <h3 className="font-serif text-lg font-semibold text-foreground">
+            No searches yet
+          </h3>
+          <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+            Run your first search to start building your history.
+          </p>
+        </div>
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 rounded-lg bg-teal px-4 py-2 text-sm font-medium text-teal-foreground transition-colors hover:bg-teal/90"
+        >
+          Start Searching
+          <ArrowRight className="size-4" />
+        </Link>
       </div>
     );
   }
@@ -117,7 +140,7 @@ export function HistoryList() {
             type="button"
             onClick={() => router.push(`/scout/${item.id}`)}
             className={cn(
-              "animate-slide-up w-full rounded-lg border border-border/60 bg-white p-4 text-left transition-all",
+              "animate-slide-up w-full rounded-lg border border-border/60 bg-card p-4 text-left transition-all",
               "hover:border-teal/30 hover:bg-teal/[0.02] hover:shadow-sm",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal/40",
               delayClass

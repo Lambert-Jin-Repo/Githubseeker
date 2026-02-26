@@ -99,6 +99,39 @@
 
 ---
 
+## Phase 9: Portfolio Enhancements (COMPLETE — 10 tasks)
+
+**Date:** 2026-02-26
+**Branch:** `feature/portfolio-enhancements`
+
+| # | Task | Status | Files Changed |
+|---|---|---|---|
+| 1 | Add `ThemeProvider` to layout | done | `app/layout.tsx` |
+| 2 | Dark mode CSS variables | done | `app/globals.css` |
+| 3 | Animated `ThemeToggle` component | done | `components/shared/ThemeToggle.tsx` (new) |
+| 4 | Theme toggle + Dashboard link in Header | done | `components/shared/Header.tsx` |
+| 5 | Fix `bg-white` hardcodes for dark mode (6 files) | done | `SearchMetaBar`, `DeepDiveCTA`, `ExecutiveSummary`, `SummaryPanel`, `loading.tsx`, `HistoryList` |
+| 6 | Dashboard API endpoint | done | `app/api/dashboard/route.ts` (new) |
+| 7 | Dashboard page | done | `app/dashboard/page.tsx` (new) |
+| 8 | Dashboard content (stats, charts, empty/error) | done | `components/dashboard/DashboardContent.tsx` (new) |
+| 9 | Reusable `ErrorBoundaryCard` component | done | `components/shared/ErrorBoundaryCard.tsx` (new) |
+| 10 | History list — error retry, dark mode badges, improved empty state | done | `components/history/HistoryList.tsx` |
+| 11 | Smooth theme transition CSS (200ms on all color properties) | done | `app/globals.css`, `app/layout.tsx` |
+| 12 | Redesign GlobalSearchStatus pill (Framer Motion animations, dark mode) | done | `components/shared/GlobalSearchStatus.tsx` |
+| 13 | Redesign SearchProgressNotification (animated progress bar, glassmorphism, stat chips) | done | `components/search/SearchProgressNotification.tsx` |
+
+### Key Changes
+- Dark/Light theme toggle with system preference detection, animated sun/moon icon
+- Full dark color palette (deep navy bg `#0F1117`, bright teal accent `#14B8A6`)
+- Smooth 200ms theme transition on all color properties (matching AI News Hub reference)
+- Dashboard page with stat cards, mode distribution bar, top topics, recent activity
+- Error retry pattern with reusable `ErrorBoundaryCard`
+- 6 `bg-white` → `bg-background`/`bg-card` fixes for dark mode consistency
+- Redesigned header search pill: spring animations, glow effect, hover scale, AnimatePresence text transitions
+- Redesigned progress card: shimmer progress bar, rotating icon with pulse ring, glassmorphism card, stat chips with slide-in, whileHover/whileTap CTA button
+
+---
+
 ## Phase 3: Polish & Robustness (NOT STARTED)
 
 | # | Task | Priority | Status | Description |
@@ -106,7 +139,7 @@
 | 1 | Error recovery for MiniMax API failures | P1 | `pending` | Show partial results + retry button if LLM fails mid-stream |
 | 2 | Error recovery for Serper API failures | P1 | `pending` | Show helpful error state if search API fails |
 | 3 | Search result caching | P1 | `pending` | Check if same query was searched recently; add "Refresh" button |
-| 4 | Loading state improvements | P1 | `pending` | Better skeleton during DB hydration; "Loading saved results..." vs "Searching..." |
+| 4 | Loading state improvements | P1 | `done` | Skeleton loading + error states added in Phase 9 |
 | 5 | Singleton Supabase client | P2 | `pending` | `createServerClient()` creates new instance per call; use lazy singleton |
 | 6 | Feedback deduplication | P2 | `pending` | Prevent duplicate feedback rows; use upsert or client-side guard |
 | 7 | History endpoint optimization | P2 | `pending` | Replace full-row fetch with aggregate count query |
@@ -125,7 +158,7 @@
 | Search | Serper API (Google Search) at `google.serper.dev/search` |
 | Database | Supabase (project: `fnylozxqgmnzvdbshzvn`, region: ap-southeast-1, free plan) |
 | State | Zustand |
-| Testing | Vitest (46 tests, 8 files) |
+| Testing | Vitest (86 tests, 12 files) |
 | Fonts | Literata (headings), Atkinson Hyperlegible Next (body), JetBrains Mono (code) |
 
 ## Key Files

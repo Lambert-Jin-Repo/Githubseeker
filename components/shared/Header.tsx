@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { GlobalSearchStatus } from "./GlobalSearchStatus";
+import { ThemeToggle } from "./ThemeToggle";
 
 export function Header() {
   return (
@@ -14,7 +15,7 @@ export function Header() {
         Skip to main content
       </a>
 
-      <header className="sticky top-0 z-50 border-b border-border/60 bg-white/80 backdrop-blur-md">
+      <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
           <Link href="/" className="flex items-center gap-1.5 group" aria-label="Git Scout — Home">
             <span className="inline-block h-3 w-3 rounded-sm bg-teal transition-transform group-hover:scale-110 group-hover:rotate-12" aria-hidden="true" />
@@ -24,15 +25,23 @@ export function Header() {
           </Link>
           <nav aria-label="Main navigation" className="flex items-center gap-4">
             <Link
+              href="/dashboard"
+              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Dashboard
+            </Link>
+            <Link
               href="/history"
               className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               History
             </Link>
             <GlobalSearchStatus />
+            <ThemeToggle />
           </nav>
         </div>
       </header>
     </>
   );
 }
+

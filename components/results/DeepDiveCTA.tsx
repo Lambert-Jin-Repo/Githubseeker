@@ -23,7 +23,7 @@ export function DeepDiveCTA({ onDeepDive }: DeepDiveCTAProps) {
   if (!phase1Complete && selectedCount === 0) return null;
 
   return (
-    <div className="fixed bottom-0 inset-x-0 z-50 border-t border-border/60 bg-white/95 backdrop-blur-md" role="region" aria-label="Deep dive selection">
+    <div className="fixed bottom-0 inset-x-0 z-50 border-t border-border/60 bg-background/95 backdrop-blur-md" role="region" aria-label="Deep dive selection">
       <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div className="text-sm text-muted-foreground" aria-live="polite">
           {hasExistingResults ? (
