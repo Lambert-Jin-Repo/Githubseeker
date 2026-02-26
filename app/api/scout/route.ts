@@ -4,7 +4,7 @@ import { callLLMWithTools } from "@/lib/llm";
 import { detectMode } from "@/lib/mode-detection";
 import { normalizeGitHubUrl, deduplicateRepos } from "@/lib/url-normalize";
 import { createServerClient, getSessionUserId } from "@/lib/supabase";
-import { analyzeRepo } from "@/lib/deep-dive-analyzer";
+import { analyzeRepoV2 } from "@/lib/deep-dive-analyzer-v2";
 import type {
   ScoutMode,
   ScoutRequest,
@@ -499,7 +499,7 @@ export async function GET(request: NextRequest) {
           if (dedupedRepos.length > 0) {
             const urls = dedupedRepos.map((r) => r.repo_url);
             Promise.allSettled(
-              urls.map((url) => analyzeRepo(url, searchId))
+              urls.map((url) => analyzeRepoV2(url, searchId))
             ).catch((err) =>
               console.error("[scout/GET] Background precompute failed:", err)
             );
