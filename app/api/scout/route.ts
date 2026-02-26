@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { callLLMWithTools } from "@/lib/llm";
 import { detectMode } from "@/lib/mode-detection";
 import { normalizeGitHubUrl, deduplicateRepos } from "@/lib/url-normalize";
+import { createServerClient, getSessionUserId } from "@/lib/supabase";
 import type {
   ScoutMode,
   ScoutRequest,
@@ -174,12 +175,30 @@ export async function POST(request: NextRequest) {
     }
 
     const searchId = uuidv4();
+    const trimmedQuery = query.trim();
 
     // Store the search params in a simple in-memory map for the GET handler
-    pendingSearches.set(searchId, { query: query.trim(), mode });
+    pendingSearches.set(searchId, { query: trimmedQuery, mode });
 
     // Clean up old entries after 5 minutes
     setTimeout(() => pendingSearches.delete(searchId), 5 * 60 * 1000);
+
+    // Persist to Supabase (non-blocking — in-memory map is the source of truth for SSE)
+    try {
+      const userId = getSessionUserId(request);
+      const supabase = createServerClient();
+      const { error } = await supabase.from("searches").insert({
+        id: searchId,
+        user_id: userId,
+        query: trimmedQuery,
+        mode,
+      });
+      if (error) {
+        console.error("[scout/POST] Supabase insert error:", error.message);
+      }
+    } catch (err) {
+      console.error("[scout/POST] Failed to persist search:", err);
+    }
 
     return NextResponse.json({ id: searchId, mode });
   } catch {
@@ -300,8 +319,12 @@ export async function GET(request: NextRequest) {
         },
         maxToolRounds: 12,
       })
-        .then((finalResponse) => {
+        .then(async (finalResponse) => {
           // Parse the JSON response from LLM
+          let dedupedRepos: RepoResult[] = [];
+          let observations: string[] = [];
+          let topicExtracted: string | null = null;
+
           try {
             // Try to extract JSON from the response (handle markdown code fences)
             let jsonStr = finalResponse;
@@ -317,9 +340,13 @@ export async function GET(request: NextRequest) {
 
             const parsed = JSON.parse(jsonStr);
 
+            // Extract topic
+            topicExtracted = (parsed.topic as string) || null;
+
             // Emit observations
             if (Array.isArray(parsed.observations)) {
-              for (const obs of parsed.observations) {
+              observations = parsed.observations;
+              for (const obs of observations) {
                 send("observation", { text: obs });
               }
             }
@@ -327,7 +354,7 @@ export async function GET(request: NextRequest) {
             // Parse and emit repos
             const rawRepos = Array.isArray(parsed.repos) ? parsed.repos : [];
             const repos = rawRepos.map((r: Record<string, unknown>) => parseRepoFromRaw(r));
-            const dedupedRepos = deduplicateRepos(repos);
+            dedupedRepos = deduplicateRepos(repos);
 
             for (const repo of dedupedRepos) {
               send("repo_discovered", repo);
@@ -362,6 +389,51 @@ export async function GET(request: NextRequest) {
               message: "Failed to parse search results. The AI may have returned malformed data.",
               recoverable: true,
             });
+          }
+
+          // Persist results to Supabase (after stream events are sent)
+          try {
+            const supabase = createServerClient();
+
+            // Batch-insert deduped repos into search_results
+            if (dedupedRepos.length > 0) {
+              const rows = dedupedRepos.map((repo) => ({
+                search_id: searchId,
+                repo_url: repo.repo_url,
+                repo_name: repo.repo_name,
+                stars: repo.stars,
+                last_commit: repo.last_commit,
+                primary_language: repo.primary_language,
+                license: repo.license,
+                quality_tier: repo.quality_tier,
+                verification: repo.verification,
+                reddit_signal: repo.reddit_signal,
+                summary: repo.summary,
+                source_strategies: repo.source_strategies,
+              }));
+
+              const { error: insertError } = await supabase
+                .from("search_results")
+                .insert(rows);
+              if (insertError) {
+                console.error("[scout/GET] Supabase search_results insert error:", insertError.message);
+              }
+            }
+
+            // Update searches row with completion data
+            const { error: updateError } = await supabase
+              .from("searches")
+              .update({
+                phase1_complete: true,
+                observations,
+                topic_extracted: topicExtracted,
+              })
+              .eq("id", searchId);
+            if (updateError) {
+              console.error("[scout/GET] Supabase searches update error:", updateError.message);
+            }
+          } catch (err) {
+            console.error("[scout/GET] Failed to persist results:", err);
           }
 
           controller.close();
