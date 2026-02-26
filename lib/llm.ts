@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import type { ChatCompletionTool } from "openai/resources/chat/completions";
-import { braveSearch, fetchWebPage } from "./brave-search";
+import { webSearch, fetchWebPage } from "./web-search";
 
 const client = new OpenAI({
   apiKey: process.env.MINIMAX_API_KEY!,
@@ -50,7 +50,7 @@ async function executeToolCall(
 ): Promise<string> {
   switch (name) {
     case "web_search": {
-      const results = await braveSearch(
+      const results = await webSearch(
         args.query as string,
         (args.count as number) || 10
       );
