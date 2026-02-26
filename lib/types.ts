@@ -120,6 +120,142 @@ export interface ScoutSummary {
   ai_ecosystem_notes: string;
 }
 
+// ===== Deep Dive V2 =====
+export interface SourceLink {
+  label: string;
+  url: string;
+}
+
+export interface EnhancedSection {
+  title: string;
+  content: string;
+  confidence: "high" | "medium" | "low";
+  sources: SourceLink[];
+}
+
+export interface CodeQuality {
+  has_tests: boolean;
+  test_framework: string | null;
+  has_ci: boolean;
+  ci_platform: string | null;
+  ci_config_url: string | null;
+  has_linting: boolean;
+  linter: string | null;
+  typescript_strict: boolean | null;
+  code_coverage_mentioned: boolean;
+  build_system: string | null;
+  confidence: "high" | "medium" | "low";
+  sources: SourceLink[];
+}
+
+export interface CommunityHealth {
+  open_issues: number | null;
+  closed_issues: number | null;
+  contributors: number | null;
+  last_commit_days_ago: number | null;
+  has_contributing_guide: boolean;
+  has_code_of_conduct: boolean;
+  bus_factor_estimate: "low" | "medium" | "high";
+  confidence: "high" | "medium" | "low";
+  sources: SourceLink[];
+}
+
+export interface DocumentationQuality {
+  readme_sections: string[];
+  has_docs_directory: boolean;
+  has_api_docs: boolean;
+  api_docs_type: string | null;
+  has_examples: boolean;
+  has_changelog: boolean;
+  has_tutorials: boolean;
+  overall_grade: "comprehensive" | "adequate" | "minimal" | "missing";
+  confidence: "high" | "medium" | "low";
+  sources: SourceLink[];
+}
+
+export interface SecurityPosture {
+  has_security_policy: boolean;
+  has_env_example: boolean;
+  env_vars_documented: boolean;
+  license_type: string;
+  license_commercial_friendly: boolean;
+  known_vulnerabilities_mentioned: boolean;
+  auth_patterns: string[];
+  confidence: "high" | "medium" | "low";
+  sources: SourceLink[];
+}
+
+export interface GettingStarted {
+  prerequisites: string[];
+  install_commands: string[];
+  first_run_command: string | null;
+  env_setup_steps: string[];
+  common_pitfalls: string[];
+  estimated_setup_time: string | null;
+  confidence: "high" | "medium" | "low";
+  sources: SourceLink[];
+}
+
+export interface DeepDiveResultV2 {
+  repo_url: string;
+  repo_name: string;
+  stars: number;
+  contributors: number | null;
+  license: string;
+  primary_language: string;
+  last_updated: string;
+  overview: EnhancedSection;
+  why_it_stands_out: EnhancedSection;
+  tech_stack: {
+    languages: string[];
+    frameworks: Array<{ name: string; version?: string; url?: string }>;
+    infrastructure: string[];
+    key_dependencies: Array<{ name: string; version?: string; url?: string }>;
+    confidence: "high" | "medium" | "low";
+    sources: SourceLink[];
+  };
+  architecture: EnhancedSection;
+  code_quality: CodeQuality;
+  community_health: CommunityHealth;
+  documentation_quality: DocumentationQuality;
+  security_posture: SecurityPosture;
+  ai_patterns: AIPatterns & { sources: SourceLink[] };
+  skills_required: {
+    technical: string[];
+    design: string[];
+    domain: string[];
+  };
+  getting_started: GettingStarted;
+  mode_specific: EnhancedSection;
+}
+
+export interface ScoutSummaryV2 {
+  takeaways: string[];
+  recommendation: {
+    repo: string;
+    repo_url: string;
+    reason: string;
+    mode: "learn" | "build" | "scout";
+  };
+  comparative_matrix: {
+    dimensions: string[];
+    repos: Array<{
+      repo_name: string;
+      values: Record<string, string>;
+    }>;
+  };
+  skills_roadmap: Array<{
+    step: number;
+    skill: string;
+    description: string;
+  }>;
+  ecosystem_gaps: Array<{
+    gap: string;
+    opportunity: string;
+  }>;
+  ai_ecosystem_notes: string;
+}
+
 // ===== SSE Events =====
 export type SSEEvent =
   | { type: "mode_detected"; data: { mode: ScoutMode; topic: string; confidence: number } }
@@ -134,6 +270,8 @@ export type SSEEvent =
   | { type: "deep_dive_section"; data: { repo_url: string; section: string; content: unknown } }
   | { type: "deep_dive_complete"; data: DeepDiveResult }
   | { type: "summary"; data: ScoutSummary }
+  | { type: "deep_dive_complete_v2"; data: DeepDiveResultV2 }
+  | { type: "summary_v2"; data: ScoutSummaryV2 }
   | { type: "error"; data: { message: string; recoverable: boolean } };
 
 // ===== History =====
