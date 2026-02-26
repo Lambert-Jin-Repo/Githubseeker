@@ -345,16 +345,14 @@ export async function POST(
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { repo_urls } = body;
-
-  if (!Array.isArray(repo_urls) || repo_urls.length === 0) {
+  if (!Array.isArray(body.repo_urls) || body.repo_urls.length === 0) {
     return NextResponse.json(
       { error: "repo_urls must be a non-empty array" },
       { status: 400 }
     );
   }
 
-  if (repo_urls.length > 5) {
+  if (body.repo_urls.length > 5) {
     return NextResponse.json(
       { error: "Maximum 5 repositories allowed for deep dive" },
       { status: 400 }
@@ -362,7 +360,7 @@ export async function POST(
   }
 
   // Validate that all URLs look like GitHub URLs
-  for (const url of repo_urls) {
+  for (const url of body.repo_urls) {
     if (typeof url !== "string" || !url.startsWith("https://github.com/")) {
       return NextResponse.json(
         { error: `Invalid GitHub URL: ${url}` },
@@ -370,6 +368,8 @@ export async function POST(
       );
     }
   }
+
+  const repo_urls: string[] = body.repo_urls;
 
   const encoder = new TextEncoder();
 
@@ -396,13 +396,11 @@ export async function POST(
 
       (async () => {
 
-        // Process each repo sequentially
-        for (let i = 0; i < repo_urls.length; i++) {
-          const repoUrl = repo_urls[i];
-
+        // Analyze a single repo — returns result or fallback
+        async function analyzeRepo(repoUrl: string, index: number): Promise<DeepDiveResult> {
           send("deep_dive_start", {
             repo_url: repoUrl,
-            index: i,
+            index,
             total: repo_urls.length,
           });
 
@@ -426,7 +424,7 @@ Fetch the repo page, read the README, check dependencies, and identify AI patter
                   });
                 }
               },
-              maxToolRounds: 8,
+              maxToolRounds: 5,
             });
 
             // Parse the LLM response
@@ -434,29 +432,30 @@ Fetch the repo page, read the README, check dependencies, and identify AI patter
             const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
             const result = parseDeepDiveResult(parsed, repoUrl);
 
-            deepDiveResults.push(result);
             send("deep_dive_complete", result);
 
-              // Persist deep dive to Supabase
-              try {
-                const db = createServerClient();
-                const { data: updated, error: upsertError } = await db
-                  .from("search_results")
-                  .update({ deep_dive: result })
-                  .eq("search_id", id)
-                  .eq("repo_url", repoUrl)
-                  .select("id");
+            // Persist deep dive to Supabase
+            try {
+              const db = createServerClient();
+              const { data: updated, error: upsertError } = await db
+                .from("search_results")
+                .update({ deep_dive: result })
+                .eq("search_id", id)
+                .eq("repo_url", repoUrl)
+                .select("id");
 
-                if (upsertError) {
-                  console.error("Failed to save deep dive:", upsertError);
-                } else if (!updated || updated.length === 0) {
-                  console.warn(`Deep dive update matched 0 rows for search_id=${id}, repo_url=${repoUrl}`);
-                }
-              } catch (e) {
-                console.error("Deep dive persist error:", e);
+              if (upsertError) {
+                console.error("Failed to save deep dive:", upsertError);
+              } else if (!updated || updated.length === 0) {
+                console.warn(`Deep dive update matched 0 rows for search_id=${id}, repo_url=${repoUrl}`);
               }
+            } catch (e) {
+              console.error("Deep dive persist error:", e);
+            }
+
+            return result;
           } catch (err) {
-            // If a single repo fails, create a minimal result and continue
+            // If a single repo fails, create a minimal result
             const fallbackResult: DeepDiveResult = {
               repo_url: repoUrl,
               repo_name: repoUrl.replace("https://github.com/", ""),
@@ -484,32 +483,44 @@ Fetch the repo page, read the README, check dependencies, and identify AI patter
               mode_specific: { ...defaultSection, title: "Key Insights" },
             };
 
-            deepDiveResults.push(fallbackResult);
             send("deep_dive_complete", fallbackResult);
 
-              // Persist fallback deep dive to Supabase
-              try {
-                const db = createServerClient();
-                const { data: updated, error: fallbackError } = await db
-                  .from("search_results")
-                  .update({ deep_dive: fallbackResult })
-                  .eq("search_id", id)
-                  .eq("repo_url", repoUrl)
-                  .select("id");
+            // Persist fallback deep dive to Supabase
+            try {
+              const db = createServerClient();
+              const { data: updated, error: fallbackError } = await db
+                .from("search_results")
+                .update({ deep_dive: fallbackResult })
+                .eq("search_id", id)
+                .eq("repo_url", repoUrl)
+                .select("id");
 
-                if (fallbackError) {
-                  console.error("Failed to save fallback deep dive:", fallbackError);
-                } else if (!updated || updated.length === 0) {
-                  console.warn(`Fallback deep dive update matched 0 rows for search_id=${id}, repo_url=${repoUrl}`);
-                }
-              } catch (e) {
-                console.error("Fallback deep dive persist error:", e);
+              if (fallbackError) {
+                console.error("Failed to save fallback deep dive:", fallbackError);
+              } else if (!updated || updated.length === 0) {
+                console.warn(`Fallback deep dive update matched 0 rows for search_id=${id}, repo_url=${repoUrl}`);
               }
+            } catch (e) {
+              console.error("Fallback deep dive persist error:", e);
+            }
 
             send("error", {
               message: `Failed to analyze ${repoUrl}: ${err instanceof Error ? err.message : "Unknown error"}`,
               recoverable: true,
             });
+
+            return fallbackResult;
+          }
+        }
+
+        // Process repos in parallel (all at once — each is an independent LLM call)
+        const results = await Promise.allSettled(
+          repo_urls.map((url, i) => analyzeRepo(url, i))
+        );
+
+        for (const result of results) {
+          if (result.status === "fulfilled") {
+            deepDiveResults.push(result.value);
           }
         }
 

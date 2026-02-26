@@ -86,9 +86,12 @@ export function ScoutResultsClient({ searchId }: ScoutResultsClientProps) {
 
   const handleDeepDive = () => {
     startDeepDive(selectedRepoUrls);
-    setTimeout(() => {
-      deepDiveRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 300);
+    // Wait for React to render the deep dive section, then scroll
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        deepDiveRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
   };
 
   const activeError = error || deepDiveError;
@@ -208,14 +211,20 @@ export function ScoutResultsClient({ searchId }: ScoutResultsClientProps) {
             {/* Right: Sidebar */}
             <aside className="space-y-6" aria-label="Search insights">
               <ObservationsPanel />
-              {curatedLists.length > 0 && <CuratedListsSection />}
-              {industryTools.length > 0 && <IndustryToolsSection />}
             </aside>
           </div>
 
+          {/* Curated Lists & Industry Tools — full-width row */}
+          {(curatedLists.length > 0 || industryTools.length > 0) && (
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              {curatedLists.length > 0 && <CuratedListsSection />}
+              {industryTools.length > 0 && <IndustryToolsSection />}
+            </div>
+          )}
+
           {/* Deep Dive Results */}
-          {deepDiveResults.length > 0 && (
-            <div ref={deepDiveRef} className="space-y-6 pt-4">
+          {(isDeepDiving || deepDiveResults.length > 0) && (
+            <div ref={deepDiveRef} className="space-y-6 pt-4 scroll-mt-6">
               <h2 className="font-serif text-3xl text-foreground">
                 Deep Dive Analysis
               </h2>
@@ -223,6 +232,12 @@ export function ScoutResultsClient({ searchId }: ScoutResultsClientProps) {
                 <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
                   Analyzing {progress.completed} of {progress.total} repositories...
                 </p>
+              )}
+              {isDeepDiving && deepDiveResults.length === 0 && (
+                <div className="flex items-center gap-3 rounded-lg border border-teal/20 bg-teal/5 px-5 py-4 text-sm text-muted-foreground animate-pulse-soft">
+                  <Loader2 className="size-4 animate-spin text-teal" aria-hidden="true" />
+                  Starting deep analysis...
+                </div>
               )}
               {deepDiveResults.map((result, index) => (
                 <DeepDiveCard
