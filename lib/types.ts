@@ -196,6 +196,27 @@ export interface GettingStarted {
   sources: SourceLink[];
 }
 
+export interface AgentEcosystemDiscovery {
+  discovered_files: Array<{
+    type: "cursorrules" | "mcp_config" | "claude_skills" | "agents_config" | "other";
+    path: string;
+    url: string;
+    summary: string;
+  }>;
+  ecosystem_mapping: {
+    cursor: { has_config: boolean; rules_count: number };
+    claude: { has_skills: boolean; has_mcp: boolean };
+    other_agents: string[];
+  };
+  trending_tools: Array<{
+    name: string;
+    relevance: string;
+    url?: string;
+  }>;
+  confidence: "high" | "medium" | "low";
+  sources: SourceLink[];
+}
+
 export interface DeepDiveResultV2 {
   repo_url: string;
   repo_name: string;
@@ -225,6 +246,7 @@ export interface DeepDiveResultV2 {
     design: string[];
     domain: string[];
   };
+  agent_ecosystem: AgentEcosystemDiscovery;
   getting_started: GettingStarted;
   mode_specific: EnhancedSection;
 }
