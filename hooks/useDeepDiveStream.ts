@@ -77,12 +77,55 @@ export function useDeepDiveStream(
 
       (async () => {
         try {
+          // Step 1: Check DB for pre-computed deep dive results
+          let ready: DeepDiveResult[] = [];
+          let missing: string[] = [...repoUrls];
+
+          try {
+            const res = await fetch(`/api/scout/${searchId}/results`, {
+              signal: abortController.signal,
+            });
+            if (res.ok) {
+              const data = await res.json();
+              const results: Array<{
+                repo_url: string;
+                deep_dive: DeepDiveResult | null;
+              }> = data.results || [];
+
+              const selectedSet = new Set(repoUrls);
+              const precomputed = results.filter(
+                (r) => selectedSet.has(r.repo_url) && r.deep_dive != null
+              );
+
+              ready = precomputed.map((r) => r.deep_dive!);
+              const readyUrls = new Set(ready.map((r) => r.repo_url));
+              missing = repoUrls.filter((url) => !readyUrls.has(url));
+            }
+          } catch (fetchErr) {
+            if ((fetchErr as Error).name === "AbortError") throw fetchErr;
+            // Failed to check DB — fall through to stream all
+          }
+
+          // Step 2: Instantly add pre-computed results to the store
+          for (const result of ready) {
+            store.addDeepDiveResult(result);
+          }
+
+          const totalRepos = ready.length + missing.length;
+          setProgress({ completed: ready.length, total: totalRepos });
+
+          // Step 3: POST to deep-dive route
+          // - If all ready: summary-only (repo_urls=[], precomputed_results=ready)
+          // - If some missing: stream missing, include precomputed for summary context
           const response = await fetch(
             `/api/scout/${searchId}/deep-dive`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ repo_urls: repoUrls }),
+              body: JSON.stringify({
+                repo_urls: missing,
+                precomputed_results: ready,
+              }),
               signal: abortController.signal,
             }
           );
@@ -102,7 +145,7 @@ export function useDeepDiveStream(
 
           const decoder = new TextDecoder();
           let buffer = "";
-          let completedCount = 0;
+          let completedCount = ready.length;
 
           while (true) {
             const { done, value } = await reader.read();
@@ -125,15 +168,7 @@ export function useDeepDiveStream(
 
                 switch (event) {
                   case "deep_dive_start": {
-                    const startData = parsed as {
-                      repo_url: string;
-                      index: number;
-                      total: number;
-                    };
-                    setProgress((prev) => ({
-                      ...prev,
-                      total: startData.total,
-                    }));
+                    // Progress feedback only
                     break;
                   }
 
@@ -144,12 +179,20 @@ export function useDeepDiveStream(
 
                   case "deep_dive_complete": {
                     const result = parsed as DeepDiveResult;
-                    store.addDeepDiveResult(result);
-                    completedCount += 1;
-                    setProgress((prev) => ({
-                      ...prev,
-                      completed: completedCount,
-                    }));
+                    // Only add to store if this wasn't a pre-computed result
+                    // (pre-computed results were already re-emitted by the server,
+                    //  but we added them to the store in step 2)
+                    const isPrecomputed = ready.some(
+                      (r) => r.repo_url === result.repo_url
+                    );
+                    if (!isPrecomputed) {
+                      store.addDeepDiveResult(result);
+                      completedCount += 1;
+                      setProgress((prev) => ({
+                        ...prev,
+                        completed: completedCount,
+                      }));
+                    }
                     break;
                   }
 
@@ -169,7 +212,6 @@ export function useDeepDiveStream(
                     if (!errData.recoverable) {
                       setError(errData.message);
                     }
-                    // Recoverable errors are logged but don't stop the stream
                     break;
                   }
 
@@ -183,7 +225,6 @@ export function useDeepDiveStream(
           }
         } catch (err) {
           if ((err as Error).name === "AbortError") {
-            // User-initiated cancellation
             return;
           }
           const message =
