@@ -64,8 +64,8 @@ export function RepoRow({ repo, index }: RepoRowProps) {
           isSelected && "bg-teal/[0.03]",
           delayClass
         )}
-        onClick={() => toggleRepoSelection(repo.repo_url)}
-        aria-selected={isSelected}
+        onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
         role="row"
       >
         <TableCell className="w-12 pr-0">
@@ -146,12 +146,6 @@ export function RepoRow({ repo, index }: RepoRowProps) {
           />
         </TableCell>
 
-        <TableCell className="min-w-[320px]">
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            {repo.summary}
-          </p>
-        </TableCell>
-
         <TableCell className="w-10">
           <button
             onClick={(e) => {
@@ -172,11 +166,16 @@ export function RepoRow({ repo, index }: RepoRowProps) {
 
       {expanded && (
         <TableRow className="animate-slide-up bg-secondary/30">
-          <TableCell colSpan={10} className="px-6 py-4">
-            <div className="space-y-3">
-              <p className="text-sm leading-relaxed text-foreground">
-                {repo.summary}
-              </p>
+          <TableCell colSpan={9} className="px-6 py-4">
+            <div className="space-y-4">
+              {repo.summary && (
+                <div className="rounded-md bg-background/50 p-4 border border-border/50">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Repository Summary</h4>
+                  <p className="text-sm leading-relaxed text-foreground">
+                    {repo.summary}
+                  </p>
+                </div>
+              )}
 
               <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
                 {repo.license && (

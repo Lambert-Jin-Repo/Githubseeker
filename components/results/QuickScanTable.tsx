@@ -257,7 +257,6 @@ export function QuickScanTable() {
                 Verification
               </TableHead>
               <TableHead className="text-sm font-semibold text-foreground">Reddit</TableHead>
-              <TableHead className="text-sm font-semibold text-foreground">Summary</TableHead>
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
@@ -272,7 +271,7 @@ export function QuickScanTable() {
               repos.length === 0 &&
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={`skel-${i}`}>
-                  <td colSpan={10}>
+                  <td colSpan={9}>
                     <RepoRowSkeleton />
                   </td>
                 </tr>
