@@ -133,8 +133,19 @@ export async function callLLMWithTools(
     }
   }
 
-  const lastAssistant = messages.filter((m) => m.role === "assistant").pop();
-  return (lastAssistant as OpenAI.ChatCompletionMessageParam & { content: string })?.content || "";
+  // Max tool rounds exhausted — ask the LLM for its final JSON answer without tools
+  messages.push({
+    role: "user",
+    content: "You have used all available tool calls. Based on the information gathered so far, return your final structured JSON response now. Do NOT use any more tools. Return ONLY the JSON object.",
+  });
+
+  const finalResponse = await client.chat.completions.create({
+    model: "MiniMax-M2.5",
+    max_tokens: 16384,
+    messages,
+  });
+
+  return finalResponse.choices[0]?.message?.content || "";
 }
 
 export { client, SCOUT_TOOLS };

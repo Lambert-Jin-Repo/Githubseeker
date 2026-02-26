@@ -378,9 +378,11 @@ export async function GET(request: NextRequest) {
           let topicExtracted: string | null = null;
 
           try {
-            // Try to extract JSON from the response (handle markdown code fences)
-            let jsonStr = finalResponse;
-            const jsonMatch = finalResponse.match(/```(?:json)?\s*([\s\S]*?)```/);
+            // Strip MiniMax <think> reasoning tags before parsing
+            let jsonStr = finalResponse.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+
+            // Try to extract JSON from markdown code fences
+            const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
             if (jsonMatch) {
               jsonStr = jsonMatch[1].trim();
             }
@@ -439,6 +441,8 @@ export async function GET(request: NextRequest) {
               unverified: dedupedRepos.length - verified,
             });
           } catch (parseError) {
+            console.error("[scout/GET] Parse error:", parseError);
+            console.error("[scout/GET] Raw LLM response (first 2000 chars):", finalResponse.slice(0, 2000));
             send("error", {
               message: "Failed to parse search results. The AI may have returned malformed data.",
               recoverable: true,
