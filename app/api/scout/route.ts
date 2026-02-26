@@ -14,27 +14,35 @@ import type {
   RedditSignal,
 } from "@/lib/types";
 
-function buildSystemPrompt(mode: ScoutMode): string {
-  return `You are GitHub Scout, an AI-powered repository intelligence agent operating in ${mode} mode.
+function buildSystemPrompt(mode: ScoutMode, isVagueQuery: boolean): string {
+  const modeLabel = isVagueQuery ? `${mode} (broad discovery)` : mode;
+  const modeGuidance = isVagueQuery
+    ? "\nThe query is broad — explore the ecosystem widely. Search across different angles and sub-topics rather than focusing on competitive positioning.\n"
+    : "";
+
+  return `You are GitHub Scout, an AI-powered repository intelligence agent operating in ${modeLabel} mode.
 
 Your job is to discover, verify, and evaluate open-source GitHub repositories for a given topic.
-
+${modeGuidance}
 ## Your Tools
-- web_search: Search the web using Google
+- web_search: Search the web using Google. Pass count: 20 for more results.
 - web_fetch: Fetch a web page. For GitHub repo URLs (github.com/owner/repo), returns structured JSON with stars, language, license, description, topics, and last commit date. For other URLs, returns raw HTML.
 
 ## Phase 1 Discovery Workflow
 
-Execute these 4 search strategies:
+IMPORTANT: Execute ALL 6 search strategies simultaneously in your first response. Call all 6 web_search tools at once — do not wait for results before starting the next search.
 
-1. **High-star repos**: Search "site:github.com {topic} stars" to find popular repositories
-2. **Awesome lists**: Search "site:github.com awesome-{topic}" to find curated lists
-3. **Editorial roundups**: Search "best open source {topic} 2025 2026" for expert reviews
-${mode === "SCOUT" ? '4. **Competitive landscape**: Search "{topic} open source alternatives 2025 2026"' : `4. **Architecture patterns**: Search "{topic} system design architecture github"`}
+1. **High-star repos**: Search "site:github.com {topic} stars" with count 20
+2. **Awesome lists**: Search "site:github.com awesome-{topic}" with count 20
+3. **Editorial roundups**: Search "best open source {topic} 2025 2026" with count 20
+${mode === "SCOUT" ? '4. **Competitive landscape**: Search "{topic} open source alternatives 2025 2026" with count 20' : `4. **Architecture patterns**: Search "{topic} system design architecture github" with count 20`}
+5. **Direct discovery**: Search "site:github.com {topic}" with count 20
+6. **GitHub topics**: Search "github.com/topics/{topic} repositories" with count 20
 
 ## Verification Requirements
 
-- Use web_fetch to verify the **top 5-8** most promising repos (Tier 1 candidates). web_fetch on a GitHub repo URL returns structured JSON metadata — no need to parse HTML yourself.
+- After discovery, use web_fetch to verify the **top 8-12** most promising repos (Tier 1 candidates). Batch all web_fetch calls in a single response for parallel execution.
+- web_fetch on a GitHub repo URL returns structured JSON metadata — no need to parse HTML yourself.
 - For remaining repos, use metadata from search snippets and mark verification level as "inferred".
 - Do NOT fabricate or guess star counts, dates, or other data.
 - Do NOT search Reddit — community analysis is handled by the deep dive phase.
@@ -281,6 +289,7 @@ export async function GET(request: NextRequest) {
 
       // Emit initial mode detection
       const modeResult = detectMode(query);
+      const isVagueQuery = modeResult.confidence === 0;
       send("mode_detected", {
         mode,
         topic: query,
@@ -289,7 +298,7 @@ export async function GET(request: NextRequest) {
 
       // Run the LLM agentic loop
       callLLMWithTools({
-        systemPrompt: buildSystemPrompt(mode),
+        systemPrompt: buildSystemPrompt(mode, isVagueQuery),
         userMessage: buildUserMessage(query, mode),
         onToolError(toolName, error) {
           if (toolName === "web_search") {
@@ -311,13 +320,14 @@ export async function GET(request: NextRequest) {
         onToolCall(toolName, args) {
           if (toolName === "web_search") {
             const searchQuery = (args.query as string) || "";
-            // Infer strategy from search query patterns
             let strategy = "general";
             if (searchQuery.includes("stars") || searchQuery.includes("popular")) strategy = "high_star";
             else if (searchQuery.includes("awesome")) strategy = "awesome_list";
             else if (searchQuery.includes("best") || searchQuery.includes("roundup")) strategy = "editorial";
             else if (searchQuery.includes("architecture") || searchQuery.includes("design")) strategy = "architecture";
             else if (searchQuery.includes("alternative")) strategy = "competitive";
+            else if (searchQuery.includes("github.com/topics")) strategy = "github_topics";
+            else if (searchQuery.includes("site:github.com") && !searchQuery.includes("awesome") && !searchQuery.includes("stars")) strategy = "direct_discovery";
 
             if (!strategiesSeen.has(strategy)) {
               strategiesSeen.add(strategy);
@@ -365,7 +375,7 @@ export async function GET(request: NextRequest) {
             }
           }
         },
-        maxToolRounds: 8,
+        maxToolRounds: isVagueQuery ? 10 : 8,
       })
         .then(async (finalResponse) => {
           // Parse the JSON response from LLM

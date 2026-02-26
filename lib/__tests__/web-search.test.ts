@@ -1,5 +1,43 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fetchGitHubMetadata, type GitHubMetadata } from "../web-search";
+import { webSearch, fetchGitHubMetadata, type GitHubMetadata } from "../web-search";
+
+describe("webSearch", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("defaults to 20 results per query", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ organic: [] }),
+    }));
+
+    await webSearch("test query");
+
+    expect(fetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        body: expect.stringContaining('"num":20'),
+      })
+    );
+  });
+
+  it("allows overriding result count", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ organic: [] }),
+    }));
+
+    await webSearch("test query", 5);
+
+    expect(fetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        body: expect.stringContaining('"num":5'),
+      })
+    );
+  });
+});
 
 // Minimal GitHub HTML fixture with metadata markers
 function buildGitHubHtml(overrides: Partial<{
