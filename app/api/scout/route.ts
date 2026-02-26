@@ -183,7 +183,7 @@ export async function POST(request: NextRequest) {
     // Clean up old entries after 5 minutes
     setTimeout(() => pendingSearches.delete(searchId), 5 * 60 * 1000);
 
-    // Persist to Supabase (non-blocking — in-memory map is the source of truth for SSE)
+    // Persist to Supabase (awaited to ensure row exists before GET handler updates it)
     try {
       const userId = getSessionUserId(request);
       const supabase = createServerClient();
@@ -345,7 +345,9 @@ export async function GET(request: NextRequest) {
 
             // Emit observations
             if (Array.isArray(parsed.observations)) {
-              observations = parsed.observations;
+              observations = parsed.observations.filter(
+                (o: unknown): o is string => typeof o === "string"
+              );
               for (const obs of observations) {
                 send("observation", { text: obs });
               }
