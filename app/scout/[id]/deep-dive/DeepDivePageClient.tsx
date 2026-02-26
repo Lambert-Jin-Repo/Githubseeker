@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import { useScoutStore } from "@/stores/scout-store";
 import { useDeepDiveStreamV2 } from "@/hooks/useDeepDiveStreamV2";
 import { DeepDiveHeader } from "@/components/deep-dive-page/DeepDiveHeader";
@@ -140,7 +141,12 @@ export function DeepDivePageClient({ searchId }: DeepDivePageClientProps) {
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:grid lg:grid-cols-[200px_1fr] lg:gap-8">
         <DeepDiveSidebar items={sidebarItems} />
 
-        <main className="space-y-8">
+        <motion.main
+          className="space-y-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+        >
           {/* Error banner */}
           {error && (
             <div
@@ -221,7 +227,7 @@ export function DeepDivePageClient({ searchId }: DeepDivePageClientProps) {
               <SectionSkeleton title="Gaps & Opportunities" />
             )}
           </section>
-        </main>
+        </motion.main>
       </div>
     </div>
   );

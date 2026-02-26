@@ -14,6 +14,7 @@ import { IndustryToolsSection } from "@/components/results/IndustryToolsSection"
 import { DeepDiveCTA } from "@/components/results/DeepDiveCTA";
 import { ExportButton } from "@/components/export/ExportButton";
 import { SearchLoadingScreen } from "@/components/results/SearchLoadingScreen";
+import { motion } from "framer-motion";
 import { SearchSkeleton } from "@/components/shared/LoadingSkeleton";
 import { AlertCircle, Loader2, RefreshCw } from "lucide-react";
 import { useSearchNotificationStore } from "@/stores/search-notification-store";
@@ -145,9 +146,12 @@ export function ScoutResultsClient({ searchId }: ScoutResultsClientProps) {
 
       {/* Results page (revealed after loading) */}
       {showResults && (
-        <main
+        <motion.main
           id="main-content"
-          className="mx-auto max-w-6xl px-4 py-6 space-y-8 sm:px-6 animate-slide-up"
+          className="mx-auto max-w-6xl px-4 py-6 space-y-8 sm:px-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
         >
           {/* Error banner */}
           {activeError && (
@@ -214,7 +218,7 @@ export function ScoutResultsClient({ searchId }: ScoutResultsClientProps) {
             </div>
           )}
 
-        </main>
+        </motion.main>
       )}
 
       {/* Sticky bottom CTA */}
