@@ -222,6 +222,13 @@
   animation: shimmer 1.8s ease-in-out infinite;
 }
 
+/* Global search status pill */
+@keyframes status-enter {
+  from { opacity: 0; transform: translateX(12px) scale(0.95); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+.animate-status-enter { animation: status-enter 0.3s ease-out both; }
+
 /* Staggered delay utilities */
 .delay-1 { animation-delay: 50ms; }
 .delay-2 { animation-delay: 100ms; }

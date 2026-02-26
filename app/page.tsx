@@ -7,8 +7,11 @@ import { Footer } from "@/components/shared/Footer";
 import { SearchInput } from "@/components/search/SearchInput";
 import { ModeIndicator } from "@/components/search/ModeIndicator";
 import { ExampleQueries } from "@/components/search/ExampleQueries";
+import { SearchProgressNotification } from "@/components/search/SearchProgressNotification";
 import { detectMode } from "@/lib/mode-detection";
 import { getOrCreateSessionId } from "@/lib/session";
+import { useSearchNotificationStore } from "@/stores/search-notification-store";
+import { useScoutStore } from "@/stores/scout-store";
 import type { ScoutMode } from "@/lib/types";
 
 export default function HomePage() {
@@ -16,6 +19,9 @@ export default function HomePage() {
   const [query, setQuery] = useState("");
   const [detectedMode, setDetectedMode] = useState<ScoutMode | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  const notifStatus = useSearchNotificationStore((s) => s.status);
+  const startSearch = useSearchNotificationStore((s) => s.startSearch);
 
   // Debounced mode detection
   useEffect(() => {
@@ -44,14 +50,23 @@ export default function HomePage() {
         });
         const data = await res.json();
         if (data.id) {
-          const cachedParam = data.cached ? "?cached=true" : "";
-          router.push(`/scout/${data.id}${cachedParam}`);
+          if (data.cached) {
+            // Cached results — navigate immediately
+            router.push(`/scout/${data.id}?cached=true`);
+          } else {
+            // Fresh search — start global notification + SSE stream
+            // Reset the scout store for fresh data
+            useScoutStore.getState().reset();
+            startSearch(data.id, searchQuery, mode);
+          }
         }
       } catch {
+        // Error handled silently
+      } finally {
         setIsLoading(false);
       }
     },
-    [detectedMode, router]
+    [detectedMode, router, startSearch]
   );
 
   const handleExample = useCallback((exampleQuery: string) => {
@@ -59,6 +74,8 @@ export default function HomePage() {
     const result = detectMode(exampleQuery);
     setDetectedMode(result.mode);
   }, []);
+
+  const isSearchActive = notifStatus !== "idle";
 
   return (
     <>
@@ -89,13 +106,18 @@ export default function HomePage() {
             />
           </div>
 
-          {/* Example queries */}
-          <div className="w-full pt-4 animate-slide-up delay-4">
-            <p className="text-center text-xs font-medium text-muted-foreground/60 mb-3 uppercase tracking-wider">
-              Try an example
-            </p>
-            <ExampleQueries onSelect={handleExample} />
-          </div>
+          {/* Center notification — replaces auto-navigation */}
+          {isSearchActive && <SearchProgressNotification />}
+
+          {/* Example queries — hide when search is active */}
+          {!isSearchActive && (
+            <div className="w-full pt-4 animate-slide-up delay-4">
+              <p className="text-center text-xs font-medium text-muted-foreground/60 mb-3 uppercase tracking-wider">
+                Try an example
+              </p>
+              <ExampleQueries onSelect={handleExample} />
+            </div>
+          )}
 
           {/* How it works */}
           <section className="w-full pt-8 animate-slide-up delay-6" aria-labelledby="how-it-works-heading">
@@ -120,3 +142,4 @@ export default function HomePage() {
     </>
   );
 }
+

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Toaster } from "@/components/ui/sonner";
+import { GlobalSearchStreamListener } from "@/components/shared/GlobalSearchStreamListener";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,6 +17,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-screen antialiased">
+        <GlobalSearchStreamListener />
         <div className="relative flex min-h-screen flex-col">
           {children}
         </div>
