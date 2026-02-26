@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import { Header } from "@/components/shared/Header";
 import { Footer } from "@/components/shared/Footer";
 import { SearchInput } from "@/components/search/SearchInput";
@@ -83,15 +84,20 @@ export default function HomePage() {
       <main id="main-content" className="flex flex-1 flex-col items-center justify-center px-4 sm:px-6">
         <div className="flex w-full max-w-2xl flex-col items-center gap-8 py-12 sm:py-24">
           {/* Hero heading */}
-          <div className="text-center space-y-3 animate-slide-up">
-            <h1 className="font-serif text-3xl sm:text-5xl md:text-6xl tracking-tight text-foreground">
-              Discover what&rsquo;s been built
+          <motion.div
+            className="text-center space-y-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+          >
+            <h1 className="font-serif font-bold text-4xl sm:text-6xl md:text-7xl tracking-tighter text-foreground">
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-teal to-blue-600">Discover</span> what&rsquo;s been built
             </h1>
-            <p className="text-lg text-muted-foreground font-sans max-w-md mx-auto leading-relaxed">
+            <p className="text-lg text-muted-foreground font-sans max-w-lg mx-auto leading-relaxed">
               AI-powered intelligence for open-source repositories.
               Search, verify, analyze.
             </p>
-          </div>
+          </motion.div>
 
           {/* Search input */}
           <div className="animate-slide-up delay-2 w-full flex flex-col items-center gap-4">

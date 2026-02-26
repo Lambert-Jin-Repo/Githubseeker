@@ -16,10 +16,10 @@ export function Header() {
 
       <header className="sticky top-0 z-50 border-b border-border/60 bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <Link href="/" className="flex items-center gap-1.5 group" aria-label="Scout — Home">
-            <span className="inline-block h-2 w-2 rounded-full bg-teal transition-transform group-hover:scale-125" aria-hidden="true" />
-            <span className="font-serif text-2xl italic text-foreground tracking-tight">
-              Scout
+          <Link href="/" className="flex items-center gap-1.5 group" aria-label="Git Scout — Home">
+            <span className="inline-block h-3 w-3 rounded-sm bg-teal transition-transform group-hover:scale-110 group-hover:rotate-12" aria-hidden="true" />
+            <span className="font-serif font-bold text-2xl tracking-tight text-foreground">
+              Git Scout
             </span>
           </Link>
           <nav aria-label="Main navigation" className="flex items-center gap-4">

@@ -1,4 +1,14 @@
-@import url('https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,200..900;1,7..72,200..900&family=Atkinson+Hyperlegible+Next:ital,wght@0,200..800;1,200..800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import '@fontsource/outfit/400.css';
+@import '@fontsource/outfit/500.css';
+@import '@fontsource/outfit/600.css';
+@import '@fontsource/outfit/700.css';
+@import '@fontsource/plus-jakarta-sans/400.css';
+@import '@fontsource/plus-jakarta-sans/500.css';
+@import '@fontsource/plus-jakarta-sans/600.css';
+@import '@fontsource/plus-jakarta-sans/700.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+@import '@fontsource/jetbrains-mono/600.css';
 
 @import "tailwindcss";
 @import "tw-animate-css";
@@ -9,8 +19,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-serif: "Literata", Georgia, serif;
-  --font-sans: "Atkinson Hyperlegible Next", system-ui, sans-serif;
+  --font-serif: "Outfit", system-ui, sans-serif;
+  --font-sans: "Plus Jakarta Sans", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -123,13 +133,17 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground font-sans;
     font-feature-settings: "kern" 1, "liga" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  h1, h2, h3 {
+
+  h1,
+  h2,
+  h3 {
     font-family: var(--font-serif);
     letter-spacing: -0.01em;
   }
@@ -137,85 +151,253 @@
 
 /* ===== Custom Animations ===== */
 @keyframes slide-up-fade {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
+
 @keyframes slide-in-right {
-  from { opacity: 0; transform: translateX(-8px); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
+
 @keyframes pulse-soft {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.6;
+  }
 }
+
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
 }
+
 @keyframes badge-pop {
-  0% { transform: scale(0.8); opacity: 0; }
-  60% { transform: scale(1.05); }
-  100% { transform: scale(1); opacity: 1; }
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+
+  60% {
+    transform: scale(1.05);
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 /* Radar loading screen animations */
 @keyframes radar-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
+
 @keyframes radar-ping {
-  0% { transform: scale(1); opacity: 0.4; }
-  50% { transform: scale(1.15); opacity: 0.15; }
-  100% { transform: scale(1); opacity: 0.4; }
+  0% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+
+  50% {
+    transform: scale(1.15);
+    opacity: 0.15;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
 }
+
 @keyframes scan-sweep {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
+
 @keyframes node-arrive {
-  0% { transform: scale(0) translateY(4px); opacity: 0; }
-  60% { transform: scale(1.15) translateY(0); }
-  100% { transform: scale(1) translateY(0); opacity: 1; }
+  0% {
+    transform: scale(0) translateY(4px);
+    opacity: 0;
+  }
+
+  60% {
+    transform: scale(1.15) translateY(0);
+  }
+
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
 }
+
 @keyframes float-particle {
-  0%, 100% { transform: translateY(0) translateX(0); opacity: 0; }
-  10% { opacity: 0.5; }
-  50% { opacity: 0.3; }
-  90% { opacity: 0; }
-  100% { transform: translateY(-40px) translateX(20px); }
+
+  0%,
+  100% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 0.5;
+  }
+
+  50% {
+    opacity: 0.3;
+  }
+
+  90% {
+    opacity: 0;
+  }
+
+  100% {
+    transform: translateY(-40px) translateX(20px);
+  }
 }
+
 @keyframes contract-center {
-  0% { transform: scale(1); opacity: 1; }
-  100% { transform: scale(0.4); opacity: 0; }
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
 }
+
 @keyframes flash-pulse {
-  0% { transform: scale(0.5); opacity: 0.8; }
-  50% { transform: scale(2.5); opacity: 0.3; }
-  100% { transform: scale(3.5); opacity: 0; }
+  0% {
+    transform: scale(0.5);
+    opacity: 0.8;
+  }
+
+  50% {
+    transform: scale(2.5);
+    opacity: 0.3;
+  }
+
+  100% {
+    transform: scale(3.5);
+    opacity: 0;
+  }
 }
+
 @keyframes counter-tick {
-  0% { transform: translateY(4px); opacity: 0; }
-  100% { transform: translateY(0); opacity: 1; }
+  0% {
+    transform: translateY(4px);
+    opacity: 0;
+  }
+
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
+
 @keyframes glow-breathe {
-  0%, 100% { opacity: 0.15; filter: blur(40px); }
-  50% { opacity: 0.3; filter: blur(50px); }
+
+  0%,
+  100% {
+    opacity: 0.15;
+    filter: blur(40px);
+  }
+
+  50% {
+    opacity: 0.3;
+    filter: blur(50px);
+  }
 }
 
-.animate-radar-spin { animation: radar-spin 8s linear infinite; }
-.animate-scan-sweep { animation: scan-sweep 3s linear infinite; }
-.animate-radar-ping { animation: radar-ping 3s ease-in-out infinite; }
-.animate-node-arrive { animation: node-arrive 0.5s ease-out both; }
-.animate-float-particle { animation: float-particle 6s ease-in-out infinite; }
-.animate-contract { animation: contract-center 0.35s ease-in both; }
-.animate-flash { animation: flash-pulse 0.5s ease-out both; }
-.animate-counter-tick { animation: counter-tick 0.3s ease-out both; }
-.animate-glow-breathe { animation: glow-breathe 4s ease-in-out infinite; }
+.animate-radar-spin {
+  animation: radar-spin 8s linear infinite;
+}
 
-.animate-slide-up { animation: slide-up-fade 0.4s ease-out both; }
-.animate-slide-in { animation: slide-in-right 0.3s ease-out both; }
-.animate-pulse-soft { animation: pulse-soft 2s ease-in-out infinite; }
-.animate-badge-pop { animation: badge-pop 0.3s ease-out both; }
+.animate-scan-sweep {
+  animation: scan-sweep 3s linear infinite;
+}
+
+.animate-radar-ping {
+  animation: radar-ping 3s ease-in-out infinite;
+}
+
+.animate-node-arrive {
+  animation: node-arrive 0.5s ease-out both;
+}
+
+.animate-float-particle {
+  animation: float-particle 6s ease-in-out infinite;
+}
+
+.animate-contract {
+  animation: contract-center 0.35s ease-in both;
+}
+
+.animate-flash {
+  animation: flash-pulse 0.5s ease-out both;
+}
+
+.animate-counter-tick {
+  animation: counter-tick 0.3s ease-out both;
+}
+
+.animate-glow-breathe {
+  animation: glow-breathe 4s ease-in-out infinite;
+}
+
+.animate-slide-up {
+  animation: slide-up-fade 0.4s ease-out both;
+}
+
+.animate-slide-in {
+  animation: slide-in-right 0.3s ease-out both;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+.animate-badge-pop {
+  animation: badge-pop 0.3s ease-out both;
+}
+
 .animate-shimmer {
   background: linear-gradient(90deg, transparent 33%, rgba(15, 118, 110, 0.04) 50%, transparent 67%);
   background-size: 200% 100%;
@@ -224,25 +406,59 @@
 
 /* Global search status pill */
 @keyframes status-enter {
-  from { opacity: 0; transform: translateX(12px) scale(0.95); }
-  to { opacity: 1; transform: translateX(0) scale(1); }
+  from {
+    opacity: 0;
+    transform: translateX(12px) scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
 }
-.animate-status-enter { animation: status-enter 0.3s ease-out both; }
+
+.animate-status-enter {
+  animation: status-enter 0.3s ease-out both;
+}
 
 /* Staggered delay utilities */
-.delay-1 { animation-delay: 50ms; }
-.delay-2 { animation-delay: 100ms; }
-.delay-3 { animation-delay: 150ms; }
-.delay-4 { animation-delay: 200ms; }
-.delay-5 { animation-delay: 250ms; }
-.delay-6 { animation-delay: 300ms; }
-.delay-7 { animation-delay: 350ms; }
-.delay-8 { animation-delay: 400ms; }
+.delay-1 {
+  animation-delay: 50ms;
+}
+
+.delay-2 {
+  animation-delay: 100ms;
+}
+
+.delay-3 {
+  animation-delay: 150ms;
+}
+
+.delay-4 {
+  animation-delay: 200ms;
+}
+
+.delay-5 {
+  animation-delay: 250ms;
+}
+
+.delay-6 {
+  animation-delay: 300ms;
+}
+
+.delay-7 {
+  animation-delay: 350ms;
+}
+
+.delay-8 {
+  animation-delay: 400ms;
+}
 
 /* ===== Subtle Texture ===== */
 .bg-grain {
   position: relative;
 }
+
 .bg-grain::before {
   content: "";
   position: absolute;
@@ -254,18 +470,62 @@
 }
 
 /* ===== Language Dot Colors (GitHub style) ===== */
-.lang-typescript { background-color: #3178C6; }
-.lang-javascript { background-color: #F7DF1E; }
-.lang-python { background-color: #3776AB; }
-.lang-rust { background-color: #DEA584; }
-.lang-go { background-color: #00ADD8; }
-.lang-java { background-color: #B07219; }
-.lang-ruby { background-color: #CC342D; }
-.lang-swift { background-color: #F05138; }
-.lang-kotlin { background-color: #A97BFF; }
-.lang-c { background-color: #555555; }
-.lang-cpp { background-color: #F34B7D; }
-.lang-csharp { background-color: #178600; }
-.lang-php { background-color: #4F5D95; }
-.lang-dart { background-color: #00B4AB; }
-.lang-default { background-color: #64748B; }
+.lang-typescript {
+  background-color: #3178C6;
+}
+
+.lang-javascript {
+  background-color: #F7DF1E;
+}
+
+.lang-python {
+  background-color: #3776AB;
+}
+
+.lang-rust {
+  background-color: #DEA584;
+}
+
+.lang-go {
+  background-color: #00ADD8;
+}
+
+.lang-java {
+  background-color: #B07219;
+}
+
+.lang-ruby {
+  background-color: #CC342D;
+}
+
+.lang-swift {
+  background-color: #F05138;
+}
+
+.lang-kotlin {
+  background-color: #A97BFF;
+}
+
+.lang-c {
+  background-color: #555555;
+}
+
+.lang-cpp {
+  background-color: #F34B7D;
+}
+
+.lang-csharp {
+  background-color: #178600;
+}
+
+.lang-php {
+  background-color: #4F5D95;
+}
+
+.lang-dart {
+  background-color: #00B4AB;
+}
+
+.lang-default {
+  background-color: #64748B;
+}
