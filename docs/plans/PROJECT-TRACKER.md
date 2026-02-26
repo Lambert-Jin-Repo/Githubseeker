@@ -72,6 +72,33 @@
 
 ---
 
+## Phase 8: Global Search Notification (COMPLETE — 5 commits)
+
+**Date:** 2026-02-26
+**Design:** `docs/plans/2026-02-26-global-search-notification-design.md`
+**Branch:** `feature/global-search-notification` (merged to main)
+
+| # | Task | Status | Commit(s) |
+|---|---|---|---|
+| 1 | Search notification Zustand store | done | `c137bb1` |
+| 2 | Global SSE stream hook (layout-level) | done | `c137bb1` |
+| 3 | Header status pill (GlobalSearchStatus) | done | `c137bb1` |
+| 4 | Center notification card (SearchProgressNotification) | done | `c137bb1` |
+| 5 | Home page — stop auto-navigation, show notification | done | `c137bb1` |
+| 6 | Results page — dismiss notification on mount | done | `c137bb1` |
+| 7 | CSS animation for status pill | done | `c137bb1` |
+| — | Fix: SSE lifecycle — use Zustand subscribe instead of effect deps | done | `0cca022` |
+| — | Fix: close SSE stream immediately after phase1_complete | done | `cfc7e68` |
+
+### Key Changes
+- Users stay on the home page after searching (no auto-navigation)
+- Center notification card shows live progress: strategy tracking, repo counter, elapsed timer
+- Header status pill persists across all pages (home, history, etc.)
+- "View Results" button appears when search completes
+- SSE stream closes immediately after phase1_complete (before Supabase persist / deep dive precompute)
+
+---
+
 ## Phase 3: Polish & Robustness (NOT STARTED)
 
 | # | Task | Priority | Status | Description |
@@ -115,8 +142,12 @@
 | `app/api/feedback/route.ts` | Persist feedback |
 | `app/api/history/route.ts` | Query search history |
 | `hooks/useScoutStream.ts` | Phase 1 SSE consumer (checks DB first) |
+| `hooks/useGlobalSearchStream.ts` | Global SSE listener (layout-level, Zustand subscribe) |
 | `hooks/useDeepDiveStream.ts` | Phase 2 SSE consumer |
 | `stores/scout-store.ts` | Full Zustand store |
+| `stores/search-notification-store.ts` | Global search notification state |
+| `components/shared/GlobalSearchStatus.tsx` | Header status pill |
+| `components/search/SearchProgressNotification.tsx` | Home page center notification |
 | `supabase/migration.sql` | DB schema reference |
 
 ## Env Keys (in .env.local)
