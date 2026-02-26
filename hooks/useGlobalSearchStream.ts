@@ -6,24 +6,32 @@ import { useScoutStore } from "@/stores/scout-store";
 
 /**
  * Global SSE listener that runs at the layout level.
- * When the notification store has a searchId with status "connecting",
- * it opens an EventSource to stream results and updates both stores.
+ * When a new searchId appears with status "connecting",
+ * it opens an EventSource and keeps it alive until completion.
  */
 export function useGlobalSearchStream() {
     const eventSourceRef = useRef<EventSource | null>(null);
     const reconnectAttemptsRef = useRef(0);
+    const activeSearchIdRef = useRef<string | null>(null);
 
     const searchId = useSearchNotificationStore((s) => s.searchId);
     const status = useSearchNotificationStore((s) => s.status);
 
-    const notifStore = useSearchNotificationStore;
-    const scoutStore = useScoutStore;
-
     useEffect(() => {
-        // Only connect when status is "connecting" (freshly started search)
+        // Only start a NEW connection when a new searchId appears with "connecting" status.
+        // If we're already connected for this searchId, do nothing.
         if (!searchId || status !== "connecting") return;
+        if (activeSearchIdRef.current === searchId) return;
+
+        // Mark this searchId as active so we don't reconnect on status changes
+        activeSearchIdRef.current = searchId;
+
+        // Close any previous connection
+        eventSourceRef.current?.close();
 
         let cancelled = false;
+        const notifStore = useSearchNotificationStore;
+        const scoutStore = useScoutStore;
 
         const connect = () => {
             if (cancelled) return;
@@ -128,6 +136,9 @@ export function useGlobalSearchStream() {
         return () => {
             cancelled = true;
             eventSourceRef.current?.close();
+            activeSearchIdRef.current = null;
         };
-    }, [searchId, status, notifStore, scoutStore]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchId, status]);
 }
+
