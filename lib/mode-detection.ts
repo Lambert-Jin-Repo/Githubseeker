@@ -5,16 +5,20 @@ const MODE_TRIGGERS: Record<ScoutMode, string[]> = {
     "learn", "teach", "tutorial", "how to", "how do", "beginner",
     "study", "understand", "skills for", "getting started",
     "explain", "introduction", "course", "education", "practice",
+    "training", "master",
   ],
   BUILD: [
     "build", "create", "make", "template", "boilerplate", "scaffold",
     "stack", "implement", "architecture", "starter", "setup",
     "deploy", "production", "project structure", "tech stack",
+    "app", "application", "service", "api", "backend",
   ],
   SCOUT: [
     "what exists", "alternatives", "compare", "comparison", "landscape",
     "trending", "overview", "tools for", "options for", "market",
     "competitors", "versus", "vs", "which is better", "what's out there",
+    "framework", "library", "toolkit", "sdk", "platform", "tool",
+    "agent", "plugin", "package", "module",
   ],
 };
 
