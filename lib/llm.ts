@@ -4,7 +4,7 @@ import { webSearch, fetchWebPage } from "./web-search";
 
 const client = new OpenAI({
   apiKey: process.env.MINIMAX_API_KEY!,
-  baseURL: "https://api.minimax.chat/v1",
+  baseURL: "https://api.minimax.io/v1",
 });
 
 const SCOUT_TOOLS: ChatCompletionTool[] = [
