@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient, getSessionUserId } from "@/lib/supabase";
+import { createServerClient, getSessionUserIdFromAuth } from "@/lib/supabase";
+import { createAuthServerClient } from "@/lib/supabase/server";
 
 const MAX_HISTORY_ITEMS = 20;
 
 /** GET /api/history — Return recent searches for the current session */
 export async function GET(request: NextRequest) {
-  const userId = getSessionUserId(request);
+  const authClient = await createAuthServerClient();
+  const userId = await getSessionUserIdFromAuth(request, authClient);
 
   if (userId === "anonymous") {
     return NextResponse.json({ items: [] });

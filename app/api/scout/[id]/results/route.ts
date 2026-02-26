@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient, getSessionUserId } from "@/lib/supabase";
+import { createServerClient, getSessionUserIdFromAuth } from "@/lib/supabase";
+import { createAuthServerClient } from "@/lib/supabase/server";
 
 export async function GET(
   request: NextRequest,
@@ -11,7 +12,8 @@ export async function GET(
     return NextResponse.json({ error: "Missing search ID" }, { status: 400 });
   }
 
-  const userId = getSessionUserId(request);
+  const authClient = await createAuthServerClient();
+  const userId = await getSessionUserIdFromAuth(request, authClient);
   const db = createServerClient();
 
   // Fetch the search record (scoped to the requesting user)
