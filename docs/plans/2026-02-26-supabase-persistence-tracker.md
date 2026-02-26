@@ -1,10 +1,13 @@
-# Supabase Persistence — Project Tracker
+# GitHub Scout — Master Project Tracker
 
 **Started:** 2026-02-26
+
+---
+
+## Phase 2: Supabase Persistence (COMPLETE)
+
 **Completed:** 2026-02-26
 **Design:** `docs/plans/2026-02-26-supabase-persistence-design.md`
-
-## Task Status
 
 | # | Task | Status | Files |
 |---|---|---|---|
@@ -19,29 +22,34 @@
 | 9 | Place FeedbackWidget in RepoRow and DeepDiveCard | `done` | `components/results/RepoRow.tsx`, `components/deep-dive/DeepDiveCard.tsx` |
 | 10 | Place ExportButton in results page | `done` | `app/scout/[id]/ScoutResultsClient.tsx` |
 
-## Post-Review Fixes
+**Commits:** 12 (`37a142c` through `baadbab`)
 
-- Added user_id authorization to results and deep-dive endpoints
-- Added empty array guard in history endpoint
-- Added store.reset() before hydrating saved results (React strict mode safety)
-- Added type guard for observations array
-- Fixed misleading "non-blocking" comment
+---
 
-## Commits (12 total)
+## Phase 3: Polish & Robustness (COMPLETE)
 
-1. `37a142c` refactor: simplify supabase client to service role + add getSessionUserId helper
-2. `e7252cf` chore: remove unused beforeEach import from supabase test
-3. `d65bf11` feat: persist Phase 1 search and results to Supabase
-4. `5e79809` fix: correct comment and add type guard for observations array
-5. `384f192` feat: persist deep dive results and phase2 completion to Supabase
-6. `7b42f99` feat: persist feedback to Supabase feedback table
-7. `201d5f4` feat: wire history to Supabase, remove in-memory store
-8. `bf8da7c` feat: add GET /api/scout/[id]/results endpoint for loading saved searches
-9. `4ceef57` feat: load saved results from Supabase before falling back to SSE
-10. `96cbf13` feat: wire FeedbackWidget into RepoRow and DeepDiveCard
-11. `9f259a4` feat: wire ExportButton into results page
-12. `baadbab` fix: add authorization checks and robustness improvements
+**Completed:** 2026-02-26
+**Migration:** `supabase/migration_phase3.sql`
+
+| # | Task | Status | Files |
+|---|---|---|---|
+| 1 | Secure cookie flag — add `; Secure` on HTTPS | `done` | `lib/session.ts` |
+| 2 | Singleton Supabase client — cache server client | `done` | `lib/supabase.ts` |
+| 3 | Deep dive update verification — `.select("id")` + warn on 0 rows | `done` | `app/api/scout/[id]/deep-dive/route.ts` |
+| 4 | Supabase migration — feedback unique constraint, count RPC, cache index | `done` | `supabase/migration_phase3.sql` (applied via MCP) |
+| 5 | Feedback deduplication — upsert + client-side ref guard | `done` | `app/api/feedback/route.ts`, `components/feedback/FeedbackWidget.tsx` |
+| 6 | History endpoint optimization — use `count_results_by_search` RPC | `done` | `app/api/history/route.ts` |
+| 7 | Serper error surfacing — `onToolError` callback, `search_error` SSE event, failed badge | `done` | `lib/llm.ts`, `app/api/scout/route.ts`, `hooks/useScoutStream.ts`, `components/results/StreamingProgress.tsx` |
+| 8 | MiniMax error recovery + retry — partial results, recoverable flag, retry button | `done` | `app/api/scout/route.ts`, `app/api/scout/[id]/deep-dive/route.ts`, `hooks/useScoutStream.ts`, `app/scout/[id]/ScoutResultsClient.tsx` |
+| 9 | Loading state improvements — `isLoadingSaved`, skeleton, saved-results UX | `done` | `hooks/useScoutStream.ts`, `app/scout/[id]/ScoutResultsClient.tsx` |
+| 10 | Search result caching + refresh — 24h cache, `force_refresh`, cached label | `done` | `app/api/scout/route.ts`, `app/page.tsx`, `app/scout/[id]/ScoutResultsClient.tsx` |
+| 11 | SafeClose guard — fix "Controller is already closed" crashes | `done` | `app/api/scout/route.ts`, `app/api/scout/[id]/deep-dive/route.ts` |
+| 12 | Orbital radar loading screen — animated SVG radar with cinematic reveal | `done` | `components/results/SearchLoadingScreen.tsx`, `app/globals.css`, `app/scout/[id]/ScoutResultsClient.tsx` |
+
+**Commits:** `2e7a90e` feat: Phase 3 polish — error recovery, caching, radar loading screen
+
+---
 
 ## Tests
 
-46/46 passing (8 test files, 3 new tests for supabase helper)
+46/46 passing (8 test files), TypeScript compiles clean
