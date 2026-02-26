@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useScoutStream } from "@/hooks/useScoutStream";
 import { useDeepDiveStream } from "@/hooks/useDeepDiveStream";
 import { useScoutStore } from "@/stores/scout-store";
@@ -15,14 +16,18 @@ import { DeepDiveCTA } from "@/components/results/DeepDiveCTA";
 import { DeepDiveCard } from "@/components/deep-dive/DeepDiveCard";
 import { SummaryPanel } from "@/components/deep-dive/SummaryPanel";
 import { ExportButton } from "@/components/export/ExportButton";
-import { AlertCircle } from "lucide-react";
+import { SearchLoadingScreen } from "@/components/results/SearchLoadingScreen";
+import { SearchSkeleton } from "@/components/shared/LoadingSkeleton";
+import { AlertCircle, Loader2, RefreshCw } from "lucide-react";
 
 interface ScoutResultsClientProps {
   searchId: string;
 }
 
 export function ScoutResultsClient({ searchId }: ScoutResultsClientProps) {
-  const { error } = useScoutStream(searchId);
+  const searchParams = useSearchParams();
+  const isCached = searchParams.get("cached") === "true";
+  const { error, isLoadingSaved, retrySearch } = useScoutStream(searchId);
   const { startDeepDive, isStreaming: isDeepDiving, progress, error: deepDiveError } = useDeepDiveStream(searchId);
   const deepDiveRef = useRef<HTMLDivElement>(null);
 
@@ -37,6 +42,48 @@ export function ScoutResultsClient({ searchId }: ScoutResultsClientProps) {
   const summary = useScoutStore((s) => s.summary);
   const phase2Complete = useScoutStore((s) => s.phase2Complete);
 
+  // Cinematic transition state
+  const [isContracting, setIsContracting] = useState(false);
+  const [showFlash, setShowFlash] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+
+  // When phase1 completes (and we were showing the loading screen), trigger cinematic reveal
+  useEffect(() => {
+    if (phase1Complete && !showResults && !isLoadingSaved) {
+      // If loaded from saved results, skip animation — show immediately
+      if (isCached || repos.length === 0) {
+        setShowResults(true);
+        return;
+      }
+
+      // Step 1: Contract the radar (0.35s)
+      setIsContracting(true);
+
+      const flashTimer = setTimeout(() => {
+        // Step 2: Flash pulse (0.2s into contract)
+        setShowFlash(true);
+      }, 250);
+
+      const revealTimer = setTimeout(() => {
+        // Step 3: Reveal results
+        setShowFlash(false);
+        setShowResults(true);
+      }, 700);
+
+      return () => {
+        clearTimeout(flashTimer);
+        clearTimeout(revealTimer);
+      };
+    }
+  }, [phase1Complete, isLoadingSaved, isCached, repos.length, showResults]);
+
+  // For cached / saved results, skip straight to results
+  useEffect(() => {
+    if (isLoadingSaved === false && phase1Complete && isCached) {
+      setShowResults(true);
+    }
+  }, [isLoadingSaved, phase1Complete, isCached]);
+
   const handleDeepDive = () => {
     startDeepDive(selectedRepoUrls);
     setTimeout(() => {
@@ -46,79 +93,157 @@ export function ScoutResultsClient({ searchId }: ScoutResultsClientProps) {
 
   const activeError = error || deepDiveError;
 
+  // Determine what to show
+  const showLoadingScreen = !showResults && !isLoadingSaved && !phase1Complete;
+  const showLoadingSaved = isLoadingSaved && !showResults;
+
   return (
     <div className="min-h-screen bg-background pb-20">
       <Header />
       <SearchMetaBar />
 
-      <main id="main-content" className="mx-auto max-w-6xl px-4 py-6 space-y-8 sm:px-6">
-        {/* Error banner */}
-        {activeError && (
-          <div role="alert" className="animate-slide-up flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-            <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
-            {activeError}
-          </div>
-        )}
-
-        {/* Streaming progress */}
-        <StreamingProgress />
-
-        {/* Export button — visible after Phase 1 completes */}
-        {phase1Complete && repos.length > 0 && (
-          <div className="flex justify-end">
-            <ExportButton
-              repos={repos}
-              deepDiveResults={deepDiveResults.length > 0 ? deepDiveResults : undefined}
-              query={searchMeta?.query || ""}
-            />
-          </div>
-        )}
-
-        {/* Main content grid */}
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_320px]">
-          {/* Left: Table */}
-          <div className="min-w-0">
-            <QuickScanTable />
-          </div>
-
-          {/* Right: Sidebar */}
-          <aside className="space-y-6" aria-label="Search insights">
-            <ObservationsPanel />
-            {curatedLists.length > 0 && <CuratedListsSection />}
-            {industryTools.length > 0 && <IndustryToolsSection />}
-          </aside>
+      {/* Flash overlay for cinematic transition */}
+      {showFlash && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none" aria-hidden="true">
+          <div className="size-24 rounded-full bg-teal/40 animate-flash" />
         </div>
+      )}
 
-        {/* Deep Dive Results */}
-        {deepDiveResults.length > 0 && (
-          <div ref={deepDiveRef} className="space-y-6 pt-4">
-            <h2 className="font-serif text-3xl text-foreground">
-              Deep Dive Analysis
-            </h2>
-            {isDeepDiving && progress.total > 0 && (
-              <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
-                Analyzing {progress.completed} of {progress.total} repositories...
-              </p>
-            )}
-            {deepDiveResults.map((result, index) => (
-              <DeepDiveCard
-                key={result.repo_url}
-                result={result}
-                mode={mode || "SCOUT"}
-                index={index}
-              />
-            ))}
+      {/* Loading screen (radar animation) */}
+      {showLoadingScreen && (
+        <main id="main-content">
+          <SearchLoadingScreen isContracting={isContracting} />
+
+          {/* Error banner overlaid on loading screen */}
+          {activeError && (
+            <div className="mx-auto max-w-6xl px-4 sm:px-6">
+              <div role="alert" className="animate-slide-up flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
+                <span className="flex-1">{activeError}</span>
+                <button
+                  type="button"
+                  onClick={retrySearch}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/20"
+                >
+                  <RefreshCw className="size-3" aria-hidden="true" />
+                  Retry Search
+                </button>
+              </div>
+            </div>
+          )}
+        </main>
+      )}
+
+      {/* Loading saved results skeleton */}
+      {showLoadingSaved && (
+        <main id="main-content" className="mx-auto max-w-6xl px-4 py-6 space-y-8 sm:px-6">
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              Loading saved results...
+            </div>
+            <SearchSkeleton />
           </div>
-        )}
+        </main>
+      )}
 
-        {/* Summary Panel */}
-        {summary && phase2Complete && (
-          <SummaryPanel summary={summary} mode={mode || "SCOUT"} />
-        )}
-      </main>
+      {/* Results page (revealed after loading) */}
+      {showResults && (
+        <main
+          id="main-content"
+          className="mx-auto max-w-6xl px-4 py-6 space-y-8 sm:px-6 animate-slide-up"
+        >
+          {/* Error banner */}
+          {activeError && (
+            <div role="alert" className="animate-slide-up flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+              <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
+              <span className="flex-1">{activeError}</span>
+              <button
+                type="button"
+                onClick={retrySearch}
+                className="inline-flex items-center gap-1.5 rounded-md bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/20"
+              >
+                <RefreshCw className="size-3" aria-hidden="true" />
+                Retry Search
+              </button>
+            </div>
+          )}
+
+          {/* Cached results label */}
+          {isCached && !activeError && (
+            <div className="flex items-center gap-3 rounded-lg border border-teal/20 bg-teal/5 px-4 py-3 text-sm text-teal">
+              <span className="flex-1">Showing cached results</span>
+              <button
+                type="button"
+                onClick={retrySearch}
+                className="inline-flex items-center gap-1.5 rounded-md bg-teal/10 px-3 py-1.5 text-xs font-medium text-teal transition-colors hover:bg-teal/20"
+              >
+                <RefreshCw className="size-3" aria-hidden="true" />
+                Refresh
+              </button>
+            </div>
+          )}
+
+          {/* Streaming progress (completion summary) */}
+          <StreamingProgress />
+
+          {/* Export button — visible after Phase 1 completes */}
+          {phase1Complete && repos.length > 0 && (
+            <div className="flex justify-end">
+              <ExportButton
+                repos={repos}
+                deepDiveResults={deepDiveResults.length > 0 ? deepDiveResults : undefined}
+                query={searchMeta?.query || ""}
+              />
+            </div>
+          )}
+
+          {/* Main content grid */}
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_320px]">
+            {/* Left: Table */}
+            <div className="min-w-0">
+              <QuickScanTable />
+            </div>
+
+            {/* Right: Sidebar */}
+            <aside className="space-y-6" aria-label="Search insights">
+              <ObservationsPanel />
+              {curatedLists.length > 0 && <CuratedListsSection />}
+              {industryTools.length > 0 && <IndustryToolsSection />}
+            </aside>
+          </div>
+
+          {/* Deep Dive Results */}
+          {deepDiveResults.length > 0 && (
+            <div ref={deepDiveRef} className="space-y-6 pt-4">
+              <h2 className="font-serif text-3xl text-foreground">
+                Deep Dive Analysis
+              </h2>
+              {isDeepDiving && progress.total > 0 && (
+                <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
+                  Analyzing {progress.completed} of {progress.total} repositories...
+                </p>
+              )}
+              {deepDiveResults.map((result, index) => (
+                <DeepDiveCard
+                  key={result.repo_url}
+                  result={result}
+                  mode={mode || "SCOUT"}
+                  index={index}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Summary Panel */}
+          {summary && phase2Complete && (
+            <SummaryPanel summary={summary} mode={mode || "SCOUT"} />
+          )}
+        </main>
+      )}
 
       {/* Sticky bottom CTA */}
-      <DeepDiveCTA onDeepDive={handleDeepDive} />
+      {showResults && <DeepDiveCTA onDeepDive={handleDeepDive} />}
     </div>
   );
 }

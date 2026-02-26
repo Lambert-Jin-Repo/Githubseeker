@@ -32,15 +32,12 @@ export async function GET(request: NextRequest) {
   }
 
   const { data: counts, error: countError } = await db
-    .from("search_results")
-    .select("search_id")
-    .in("search_id", searchIds);
+    .rpc("count_results_by_search", { search_ids: searchIds });
 
   const repoCountMap = new Map<string, number>();
   if (!countError && counts) {
-    for (const row of counts) {
-      const current = repoCountMap.get(row.search_id) || 0;
-      repoCountMap.set(row.search_id, current + 1);
+    for (const row of counts as { search_id: string; count: number }[]) {
+      repoCountMap.set(row.search_id, Number(row.count));
     }
   }
 

@@ -375,6 +375,8 @@ export async function POST(
 
   const stream = new ReadableStream({
     start(controller) {
+      let closed = false;
+
       function send(event: string, data: unknown) {
         try {
           controller.enqueue(encoder.encode(sseEncode(event, data)));
@@ -383,8 +385,16 @@ export async function POST(
         }
       }
 
+      function safeClose() {
+        if (!closed) {
+          closed = true;
+          try { controller.close(); } catch { /* already closed */ }
+        }
+      }
+
+      const deepDiveResults: DeepDiveResult[] = [];
+
       (async () => {
-        const deepDiveResults: DeepDiveResult[] = [];
 
         // Process each repo sequentially
         for (let i = 0; i < repo_urls.length; i++) {
@@ -430,14 +440,17 @@ Fetch the repo page, read the README, check dependencies, and identify AI patter
               // Persist deep dive to Supabase
               try {
                 const db = createServerClient();
-                const { error: upsertError } = await db
+                const { data: updated, error: upsertError } = await db
                   .from("search_results")
                   .update({ deep_dive: result })
                   .eq("search_id", id)
-                  .eq("repo_url", repoUrl);
+                  .eq("repo_url", repoUrl)
+                  .select("id");
 
                 if (upsertError) {
                   console.error("Failed to save deep dive:", upsertError);
+                } else if (!updated || updated.length === 0) {
+                  console.warn(`Deep dive update matched 0 rows for search_id=${id}, repo_url=${repoUrl}`);
                 }
               } catch (e) {
                 console.error("Deep dive persist error:", e);
@@ -477,11 +490,18 @@ Fetch the repo page, read the README, check dependencies, and identify AI patter
               // Persist fallback deep dive to Supabase
               try {
                 const db = createServerClient();
-                await db
+                const { data: updated, error: fallbackError } = await db
                   .from("search_results")
                   .update({ deep_dive: fallbackResult })
                   .eq("search_id", id)
-                  .eq("repo_url", repoUrl);
+                  .eq("repo_url", repoUrl)
+                  .select("id");
+
+                if (fallbackError) {
+                  console.error("Failed to save fallback deep dive:", fallbackError);
+                } else if (!updated || updated.length === 0) {
+                  console.warn(`Fallback deep dive update matched 0 rows for search_id=${id}, repo_url=${repoUrl}`);
+                }
               } catch (e) {
                 console.error("Fallback deep dive persist error:", e);
               }
@@ -513,10 +533,17 @@ Fetch the repo page, read the README, check dependencies, and identify AI patter
             // Mark phase2 complete in Supabase
             try {
               const db = createServerClient();
-              await db
+              const { data: updated, error: p2Error } = await db
                 .from("searches")
                 .update({ phase2_complete: true })
-                .eq("id", id);
+                .eq("id", id)
+                .select("id");
+
+              if (p2Error) {
+                console.error("Phase2 complete persist error:", p2Error);
+              } else if (!updated || updated.length === 0) {
+                console.warn(`Phase2 complete update matched 0 rows for search id=${id}`);
+              }
             } catch (e) {
               console.error("Phase2 complete persist error:", e);
             }
@@ -533,22 +560,39 @@ Fetch the repo page, read the README, check dependencies, and identify AI patter
 
             try {
               const db = createServerClient();
-              await db
+              const { data: updated, error: p2Error } = await db
                 .from("searches")
                 .update({ phase2_complete: true })
-                .eq("id", id);
+                .eq("id", id)
+                .select("id");
+
+              if (p2Error) {
+                console.error("Phase2 fallback complete persist error:", p2Error);
+              } else if (!updated || updated.length === 0) {
+                console.warn(`Phase2 fallback complete update matched 0 rows for search id=${id}`);
+              }
             } catch (e) {
               console.error("Phase2 complete persist error:", e);
             }
         }
 
-        controller.close();
+        safeClose();
       })().catch((err) => {
+        // If we already have some results, send a fallback summary first
+        if (deepDiveResults.length > 0) {
+          send("summary", {
+            takeaways: [`Partially analyzed ${deepDiveResults.length} repositories before an error occurred.`],
+            recommendations: {},
+            skills_roadmap: [],
+            gaps_discovered: [],
+            ai_ecosystem_notes: "Analysis was interrupted. Review individual repo analyses above.",
+          });
+        }
         send("error", {
           message: err instanceof Error ? err.message : "Deep dive failed",
-          recoverable: false,
+          recoverable: true,
         });
-        controller.close();
+        safeClose();
       });
     },
   });

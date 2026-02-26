@@ -37,14 +37,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Persist to Supabase
+    // Persist to Supabase (upsert to deduplicate same signal per search+repo)
     const db = createServerClient();
-    const { error: dbError } = await db.from("feedback").insert({
-      search_id,
-      repo_url,
-      signal,
-      ...(comment ? { comment } : {}),
-    });
+    const { error: dbError } = await db.from("feedback").upsert(
+      {
+        search_id,
+        repo_url,
+        signal,
+        ...(comment ? { comment } : {}),
+      },
+      { onConflict: "search_id,repo_url,signal" }
+    );
 
     if (dbError) {
       console.error("Failed to save feedback:", dbError);

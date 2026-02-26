@@ -70,6 +70,7 @@ export interface LLMCallOptions {
   userMessage: string;
   onToolCall?: (toolName: string, args: Record<string, unknown>) => void;
   onToolResult?: (toolName: string, result: string) => void;
+  onToolError?: (toolName: string, error: Error) => void;
   maxToolRounds?: number;
 }
 
@@ -81,6 +82,7 @@ export async function callLLMWithTools(
     userMessage,
     onToolCall,
     onToolResult,
+    onToolError,
     maxToolRounds = 10,
   } = options;
 
@@ -115,8 +117,10 @@ export async function callLLMWithTools(
       try {
         result = await executeToolCall(toolCall.function.name, args);
       } catch (err) {
+        const toolError = err instanceof Error ? err : new Error("Tool execution failed");
+        onToolError?.(toolCall.function.name, toolError);
         result = JSON.stringify({
-          error: err instanceof Error ? err.message : "Tool execution failed",
+          error: toolError.message,
         });
       }
       onToolResult?.(toolCall.function.name, result);

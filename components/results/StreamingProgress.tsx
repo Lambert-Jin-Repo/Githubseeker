@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Loader2 } from "lucide-react";
+import { AlertCircle, Check, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useScoutStore } from "@/stores/scout-store";
 import { cn } from "@/lib/utils";
@@ -53,6 +53,7 @@ export function StreamingProgress() {
         {searchProgress.map((progress, idx) => {
           const isRunning = progress.status === "running";
           const isComplete = progress.status === "complete";
+          const isFailed = progress.status === "failed";
 
           return (
             <Badge
@@ -61,10 +62,12 @@ export function StreamingProgress() {
               className={cn(
                 "animate-slide-in gap-1.5 border px-3 py-1 text-xs font-medium transition-colors",
                 isComplete && "border-success/30 bg-success/5 text-success",
+                isFailed && "border-destructive/30 bg-destructive/5 text-destructive",
                 isRunning &&
                   "border-teal/30 bg-teal/5 text-teal animate-pulse-soft",
                 !isComplete &&
                   !isRunning &&
+                  !isFailed &&
                   "border-border bg-secondary text-muted-foreground",
                 idx === 0 && "delay-1",
                 idx === 1 && "delay-2",
@@ -77,6 +80,7 @@ export function StreamingProgress() {
             >
               {isRunning && <Loader2 className="size-3 animate-spin" />}
               {isComplete && <Check className="size-3" />}
+              {isFailed && <AlertCircle className="size-3" />}
               {getDisplayName(progress.strategy)}
               {isComplete && progress.repos_found > 0 && (
                 <span className="ml-0.5 text-[10px] opacity-70">

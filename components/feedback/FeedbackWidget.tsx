@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { ThumbsUp, ThumbsDown, Flag } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -42,6 +42,7 @@ export function FeedbackWidget({ searchId, repoUrl }: FeedbackWidgetProps) {
   const [showComment, setShowComment] = useState(false);
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittedSignals = useRef(new Set<FeedbackSignal>());
 
   async function submitFeedback(signal: FeedbackSignal, feedbackComment?: string) {
     setIsSubmitting(true);
@@ -83,7 +84,12 @@ export function FeedbackWidget({ searchId, repoUrl }: FeedbackWidgetProps) {
 
     setSelected(signal);
     setShowComment(true);
-    submitFeedback(signal);
+
+    // Skip API call if this signal was already submitted
+    if (!submittedSignals.current.has(signal)) {
+      submittedSignals.current.add(signal);
+      submitFeedback(signal);
+    }
   }
 
   function handleCommentSubmit() {

@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import type { NextRequest } from "next/server";
 import { isValidSessionId } from "./session";
 
@@ -8,10 +8,15 @@ const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
 // Client-side Supabase client (uses publishable key)
 export const supabase = createClient(supabaseUrl, supabasePublishableKey);
 
+// Singleton server-side client (service role is stateless, safe to reuse)
+let _serverClient: SupabaseClient | null = null;
+
 // Server-side Supabase client (uses service role key, bypasses RLS)
 export function createServerClient() {
+  if (_serverClient) return _serverClient;
   const secretKey = process.env.SUPABASE_SECRET_KEY!;
-  return createClient(supabaseUrl, secretKey);
+  _serverClient = createClient(supabaseUrl, secretKey);
+  return _serverClient;
 }
 
 const SESSION_COOKIE_NAME = "github_scout_session";

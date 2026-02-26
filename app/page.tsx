@@ -41,7 +41,8 @@ export default function HomePage() {
         });
         const data = await res.json();
         if (data.id) {
-          router.push(`/scout/${data.id}`);
+          const cachedParam = data.cached ? "?cached=true" : "";
+          router.push(`/scout/${data.id}${cachedParam}`);
         }
       } catch {
         setIsLoading(false);

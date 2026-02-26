@@ -157,8 +157,8 @@ function sseEncode(event: string, data: unknown): string {
 // POST /api/scout — Start a new search, returns { id } for SSE connection
 export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json()) as ScoutRequest;
-    const { query, mode: requestedMode } = body;
+    const body = (await request.json()) as ScoutRequest & { force_refresh?: boolean };
+    const { query, mode: requestedMode, force_refresh } = body;
 
     if (!query || query.trim().length < 3 || query.trim().length > 200) {
       return NextResponse.json(
@@ -174,8 +174,35 @@ export async function POST(request: NextRequest) {
       if (detected.mode) mode = detected.mode;
     }
 
-    const searchId = uuidv4();
     const trimmedQuery = query.trim();
+
+    // Check for cached results (same user + query within last 24 hours)
+    if (!force_refresh) {
+      try {
+        const userId = getSessionUserId(request);
+        const supabase = createServerClient();
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+        const { data: cached } = await supabase
+          .from("searches")
+          .select("id, mode")
+          .eq("user_id", userId)
+          .eq("query", trimmedQuery)
+          .eq("phase1_complete", true)
+          .gte("created_at", twentyFourHoursAgo)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+
+        if (cached) {
+          return NextResponse.json({ id: cached.id, mode: cached.mode, cached: true });
+        }
+      } catch {
+        // No cached result found, proceed with new search
+      }
+    }
+
+    const searchId = uuidv4();
 
     // Store the search params in a simple in-memory map for the GET handler
     pendingSearches.set(searchId, { query: trimmedQuery, mode });
@@ -237,12 +264,20 @@ export async function GET(request: NextRequest) {
       // Track search strategies as they happen
       const strategiesSeen = new Set<string>();
       let repoCount = 0;
+      let closed = false;
 
       function send(event: string, data: unknown) {
         try {
           controller.enqueue(encoder.encode(sseEncode(event, data)));
         } catch {
           // Stream may have been closed
+        }
+      }
+
+      function safeClose() {
+        if (!closed) {
+          closed = true;
+          try { controller.close(); } catch { /* already closed */ }
         }
       }
 
@@ -258,6 +293,23 @@ export async function GET(request: NextRequest) {
       callLLMWithTools({
         systemPrompt: buildSystemPrompt(mode),
         userMessage: buildUserMessage(query, mode),
+        onToolError(toolName, error) {
+          if (toolName === "web_search") {
+            send("search_error", {
+              strategy: Array.from(strategiesSeen).pop() || "general",
+              message: error.message,
+            });
+            // Mark the most recent strategy as failed
+            const lastStrategy = Array.from(strategiesSeen).pop();
+            if (lastStrategy) {
+              send("search_progress", {
+                strategy: lastStrategy,
+                status: "failed",
+                repos_found: 0,
+              });
+            }
+          }
+        },
         onToolCall(toolName, args) {
           if (toolName === "web_search") {
             const searchQuery = (args.query as string) || "";
@@ -438,14 +490,23 @@ export async function GET(request: NextRequest) {
             console.error("[scout/GET] Failed to persist results:", err);
           }
 
-          controller.close();
+          safeClose();
         })
         .catch((err) => {
+          // If we already have some repos, send partial completion before the error
+          if (repoCount > 0) {
+            send("phase1_complete", {
+              total_repos: repoCount,
+              verified: 0,
+              unverified: repoCount,
+              partial: true,
+            });
+          }
           send("error", {
             message: err instanceof Error ? err.message : "Search failed",
-            recoverable: false,
+            recoverable: true,
           });
-          controller.close();
+          safeClose();
         });
     },
     cancel() {

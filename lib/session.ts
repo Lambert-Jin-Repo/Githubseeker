@@ -26,6 +26,7 @@ export function getOrCreateSessionId(): string {
   }
 
   const newId = generateSessionId();
-  document.cookie = `${SESSION_COOKIE_NAME}=${newId}; path=/; max-age=${60 * 60 * 24 * 90}; SameSite=Lax`;
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `${SESSION_COOKIE_NAME}=${newId}; path=/; max-age=${60 * 60 * 24 * 90}; SameSite=Lax${secure}`;
   return newId;
 }

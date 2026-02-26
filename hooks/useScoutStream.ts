@@ -1,18 +1,23 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useScoutStore } from "@/stores/scout-store";
 
 export function useScoutStream(searchId: string | null) {
   const [isConnected, setIsConnected] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  const [isLoadingSaved, setIsLoadingSaved] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const queryRef = useRef<string | null>(null);
   const store = useScoutStore();
 
   useEffect(() => {
-    if (!searchId) return;
+    if (!searchId) {
+      setIsLoadingSaved(false);
+      return;
+    }
 
     let cancelled = false;
 
@@ -37,6 +42,7 @@ export function useScoutStream(searchId: string | null) {
               created_at: data.search.created_at,
             });
             store.setMode(data.search.mode);
+            queryRef.current = data.search.query;
 
             for (const obs of data.search.observations || []) {
               store.addObservation(obs);
@@ -57,6 +63,7 @@ export function useScoutStream(searchId: string | null) {
             }
 
             setIsComplete(true);
+            setIsLoadingSaved(false);
             return; // Don't connect to SSE
           }
         }
@@ -64,6 +71,7 @@ export function useScoutStream(searchId: string | null) {
         // Failed to load saved results, fall back to SSE
       }
 
+      setIsLoadingSaved(false);
       if (cancelled) return;
 
       // Fall back to SSE stream
@@ -80,6 +88,7 @@ export function useScoutStream(searchId: string | null) {
         es.addEventListener("mode_detected", (e) => {
           const data = JSON.parse(e.data);
           store.setMode(data.mode);
+          queryRef.current = data.topic || "";
           store.setSearchMeta({
             id: searchId,
             query: data.topic || "",
@@ -122,6 +131,30 @@ export function useScoutStream(searchId: string | null) {
           store.addIndustryTool(data);
         });
 
+        es.addEventListener("search_error", (e) => {
+          const data = JSON.parse(e.data);
+          console.warn(`Search error (${data.strategy}): ${data.message}`);
+        });
+
+        // Listen for custom SSE error events from the server
+        es.addEventListener("error", (e) => {
+          // This handles the custom "error" SSE event (not the native EventSource error)
+          try {
+            const data = JSON.parse((e as MessageEvent).data);
+            if (data.recoverable) {
+              setError((data.message || "Something went wrong") + " — partial results shown below");
+              store.setPhase1Complete(true);
+              store.setIsSearching(false);
+              setIsComplete(true);
+              es.close();
+            } else {
+              setError(data.message || "Search failed");
+            }
+          } catch {
+            // Not a JSON payload — might be a native EventSource error, handled by es.onerror
+          }
+        });
+
         es.addEventListener("phase1_complete", () => {
           setIsComplete(true);
           store.setPhase1Complete(true);
@@ -151,5 +184,24 @@ export function useScoutStream(searchId: string | null) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchId]);
 
-  return { isConnected, isComplete, error };
+  const retrySearch = useCallback(async () => {
+    const query = queryRef.current;
+    if (!query) return;
+
+    try {
+      const res = await fetch("/api/scout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, force_refresh: true }),
+      });
+      const data = await res.json();
+      if (data.id) {
+        window.location.href = `/scout/${data.id}`;
+      }
+    } catch {
+      setError("Failed to retry search. Please try again.");
+    }
+  }, []);
+
+  return { isConnected, isComplete, isLoadingSaved, error, retrySearch };
 }
