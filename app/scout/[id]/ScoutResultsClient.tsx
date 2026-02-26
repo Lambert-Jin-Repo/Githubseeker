@@ -197,17 +197,17 @@ export function ScoutResultsClient({ searchId }: ScoutResultsClientProps) {
             </div>
           )}
 
-          {/* Main content grid */}
-          <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_320px]">
-            {/* Left: Table */}
+          {/* Main content stack */}
+          <div className="space-y-8">
+            {/* Top: Table */}
             <div className="min-w-0">
               <QuickScanTable />
             </div>
 
-            {/* Right: Sidebar */}
-            <aside className="space-y-6" aria-label="Search insights">
+            {/* Bottom: Observations */}
+            <section aria-label="Search insights">
               <ObservationsPanel />
-            </aside>
+            </section>
           </div>
 
           {/* Curated Lists & Industry Tools — full-width row */}

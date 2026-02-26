@@ -18,15 +18,17 @@ export function ObservationsPanel() {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-3" aria-live="polite">
+        <div className="columns-1 md:columns-2 lg:columns-3 gap-8 space-y-4" aria-live="polite">
           {observations.map((obs, idx) => (
-            <p
+            <div
               key={idx}
-              className="animate-slide-in text-sm leading-relaxed text-muted-foreground"
+              className="break-inside-avoid animate-slide-in rounded-lg bg-muted/40 p-4 border border-border/40"
               style={{ animationDelay: `${idx * 100}ms` }}
             >
-              {obs}
-            </p>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {obs}
+              </p>
+            </div>
           ))}
         </div>
       </CardContent>
