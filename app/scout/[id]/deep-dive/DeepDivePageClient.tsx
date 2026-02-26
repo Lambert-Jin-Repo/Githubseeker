@@ -7,6 +7,10 @@ import { useDeepDiveStreamV2 } from "@/hooks/useDeepDiveStreamV2";
 import { DeepDiveHeader } from "@/components/deep-dive-page/DeepDiveHeader";
 import { DeepDiveSidebar } from "@/components/deep-dive-page/DeepDiveSidebar";
 import { SectionSkeleton } from "@/components/deep-dive-page/SectionSkeleton";
+import { ExecutiveSummary } from "@/components/deep-dive-page/ExecutiveSummary";
+import { ComparativeMatrix } from "@/components/deep-dive-page/ComparativeMatrix";
+import { RepoAnalysisCard } from "@/components/deep-dive-page/RepoAnalysisCard";
+import { EcosystemGaps } from "@/components/deep-dive-page/EcosystemGaps";
 import { AlertCircle, Loader2 } from "lucide-react";
 
 interface DeepDivePageClientProps {
@@ -175,16 +179,8 @@ export function DeepDivePageClient({ searchId }: DeepDivePageClientProps) {
 
           {/* Section: Overview */}
           <section id="overview" className="scroll-mt-24">
-            {summaryV2 ? (
-              <div className="rounded-lg border border-border/50 bg-card p-6">
-                <h2 className="font-serif text-xl font-semibold text-foreground">
-                  Overview
-                </h2>
-                {/* Overview content placeholder - will be wired in Task 10 */}
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {summaryV2.takeaways.join(" ")}
-                </p>
-              </div>
+            {isComplete && summaryV2 ? (
+              <ExecutiveSummary summary={summaryV2} mode={mode || "SCOUT"} />
             ) : (
               <SectionSkeleton title="Overview" />
             )}
@@ -192,25 +188,15 @@ export function DeepDivePageClient({ searchId }: DeepDivePageClientProps) {
 
           {/* Section: Compare */}
           <section id="compare" className="scroll-mt-24">
-            {summaryV2?.comparative_matrix ? (
-              <div className="rounded-lg border border-border/50 bg-card p-6">
-                <h2 className="font-serif text-xl font-semibold text-foreground">
-                  Comparative Analysis
-                </h2>
-                {/* Comparative matrix placeholder - will be wired in Task 10 */}
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Comparing {summaryV2.comparative_matrix.repos.length}{" "}
-                  repositories across{" "}
-                  {summaryV2.comparative_matrix.dimensions.length} dimensions.
-                </p>
-              </div>
+            {isComplete && summaryV2 ? (
+              <ComparativeMatrix summary={summaryV2} />
             ) : (
               <SectionSkeleton title="Comparative Analysis" />
             )}
           </section>
 
           {/* Section: Individual Repos */}
-          {repoUrls.map((url) => {
+          {repoUrls.map((url, i) => {
             const sectionId = repoUrlToSectionId(url);
             const displayName = repoUrlToDisplayName(url);
             const result = deepDiveResultsV2.find((r) => r.repo_url === url);
@@ -218,16 +204,11 @@ export function DeepDivePageClient({ searchId }: DeepDivePageClientProps) {
             return (
               <section key={url} id={sectionId} className="scroll-mt-24">
                 {result ? (
-                  <div className="rounded-lg border border-border/50 bg-card p-6">
-                    <h2 className="font-serif text-xl font-semibold text-foreground">
-                      {result.repo_name}
-                    </h2>
-                    {/* Repo deep dive content placeholder - will be wired in Task 10 */}
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {result.overview?.content?.slice(0, 200)}
-                      {(result.overview?.content?.length ?? 0) > 200 && "..."}
-                    </p>
-                  </div>
+                  <RepoAnalysisCard
+                    result={result}
+                    mode={mode || "SCOUT"}
+                    index={i}
+                  />
                 ) : (
                   <SectionSkeleton title={displayName} />
                 )}
@@ -237,18 +218,8 @@ export function DeepDivePageClient({ searchId }: DeepDivePageClientProps) {
 
           {/* Section: Gaps & Opportunities */}
           <section id="gaps" className="scroll-mt-24">
-            {summaryV2?.ecosystem_gaps && summaryV2.ecosystem_gaps.length > 0 ? (
-              <div className="rounded-lg border border-border/50 bg-card p-6">
-                <h2 className="font-serif text-xl font-semibold text-foreground">
-                  Gaps & Opportunities
-                </h2>
-                {/* Gaps content placeholder - will be wired in Task 10 */}
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {summaryV2.ecosystem_gaps.length} ecosystem{" "}
-                  {summaryV2.ecosystem_gaps.length === 1 ? "gap" : "gaps"}{" "}
-                  identified.
-                </p>
-              </div>
+            {isComplete && summaryV2 ? (
+              <EcosystemGaps gaps={summaryV2.ecosystem_gaps} />
             ) : (
               <SectionSkeleton title="Gaps & Opportunities" />
             )}
