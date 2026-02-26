@@ -5,7 +5,9 @@ import type {
   RepoResult,
   RepoVerification,
   DeepDiveResult,
+  DeepDiveResultV2,
   ScoutSummary,
+  ScoutSummaryV2,
 } from "@/lib/types";
 
 interface ScoutStore {
@@ -26,6 +28,10 @@ interface ScoutStore {
   isDeepDiving: boolean;
   phase2Complete: boolean;
 
+  deepDiveResultsV2: DeepDiveResultV2[];
+  summaryV2: ScoutSummaryV2 | null;
+  deepDivePageReady: boolean;
+
   setSearchMeta: (meta: SearchMeta) => void;
   setMode: (mode: ScoutMode) => void;
   setIsSearching: (v: boolean) => void;
@@ -41,6 +47,9 @@ interface ScoutStore {
   setSummary: (summary: ScoutSummary) => void;
   setIsDeepDiving: (v: boolean) => void;
   setPhase2Complete: (v: boolean) => void;
+  addDeepDiveResultV2: (result: DeepDiveResultV2) => void;
+  setSummaryV2: (summary: ScoutSummaryV2) => void;
+  setDeepDivePageReady: (ready: boolean) => void;
   reset: () => void;
 }
 
@@ -59,6 +68,9 @@ const initialState = {
   summary: null,
   isDeepDiving: false,
   phase2Complete: false,
+  deepDiveResultsV2: [],
+  summaryV2: null,
+  deepDivePageReady: false,
 };
 
 export const useScoutStore = create<ScoutStore>((set) => ({
@@ -118,5 +130,11 @@ export const useScoutStore = create<ScoutStore>((set) => ({
   setSummary: (summary) => set({ summary }),
   setIsDeepDiving: (v) => set({ isDeepDiving: v }),
   setPhase2Complete: (v) => set({ phase2Complete: v }),
+
+  addDeepDiveResultV2: (result) =>
+    set((s) => ({ deepDiveResultsV2: [...s.deepDiveResultsV2, result] })),
+  setSummaryV2: (summary) => set({ summaryV2: summary }),
+  setDeepDivePageReady: (ready) => set({ deepDivePageReady: ready }),
+
   reset: () => set(initialState),
 }));

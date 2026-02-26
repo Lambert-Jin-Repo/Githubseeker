@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useScoutStore } from "../scout-store";
+import type { DeepDiveResultV2, ScoutSummaryV2 } from "@/lib/types";
 
 describe("ScoutStore", () => {
   beforeEach(() => {
@@ -78,6 +79,164 @@ describe("ScoutStore", () => {
     useScoutStore.getState().reset();
     expect(useScoutStore.getState().mode).toBeNull();
     expect(useScoutStore.getState().observations).toEqual([]);
+  });
+});
+
+describe("V2 deep dive state", () => {
+  beforeEach(() => {
+    useScoutStore.getState().reset();
+  });
+
+  it("stores deepDiveResultsV2 separately from V1", () => {
+    const state = useScoutStore.getState();
+    expect(state.deepDiveResultsV2).toEqual([]);
+    expect(state.deepDiveResults).toEqual([]);
+  });
+
+  it("addDeepDiveResultV2 appends to V2 array", () => {
+    const mockResult: DeepDiveResultV2 = {
+      repo_url: "https://github.com/test/repo",
+      repo_name: "test/repo",
+      stars: 500,
+      contributors: 12,
+      license: "MIT",
+      primary_language: "TypeScript",
+      last_updated: "2026-02-01",
+      overview: { title: "Overview", content: "A test repo", confidence: "high", sources: [] },
+      why_it_stands_out: { title: "Standout", content: "Unique approach", confidence: "medium", sources: [] },
+      tech_stack: {
+        languages: ["TypeScript"],
+        frameworks: [{ name: "Next.js" }],
+        infrastructure: ["Vercel"],
+        key_dependencies: [{ name: "React" }],
+        confidence: "high",
+        sources: [],
+      },
+      architecture: { title: "Architecture", content: "Modular", confidence: "high", sources: [] },
+      code_quality: {
+        has_tests: true,
+        test_framework: "vitest",
+        has_ci: true,
+        ci_platform: "GitHub Actions",
+        ci_config_url: null,
+        has_linting: true,
+        linter: "eslint",
+        typescript_strict: true,
+        code_coverage_mentioned: false,
+        build_system: "turbo",
+        confidence: "high",
+        sources: [],
+      },
+      community_health: {
+        open_issues: 10,
+        closed_issues: 50,
+        contributors: 12,
+        last_commit_days_ago: 3,
+        has_contributing_guide: true,
+        has_code_of_conduct: true,
+        bus_factor_estimate: "medium",
+        confidence: "high",
+        sources: [],
+      },
+      documentation_quality: {
+        has_readme: true,
+        readme_quality: "comprehensive",
+        has_api_docs: true,
+        has_examples: true,
+        has_changelog: true,
+        docs_site_url: null,
+        confidence: "high",
+        sources: [],
+      },
+      security_posture: {
+        has_security_policy: true,
+        known_vulnerabilities_mentioned: false,
+        uses_dependabot: true,
+        audit_history: null,
+        confidence: "medium",
+        sources: [],
+      },
+      ai_patterns: {
+        uses_ai: false,
+        ai_frameworks: [],
+        model_types: [],
+        notable_patterns: [],
+        sources: [],
+      },
+      skills_required: {
+        technical: ["TypeScript"],
+        design: [],
+        domain: [],
+      },
+      getting_started: {
+        prerequisites: ["Node.js"],
+        install_steps: ["npm install"],
+        first_task: "Run tests",
+        estimated_setup_time: "5 minutes",
+        confidence: "high",
+        sources: [],
+      },
+      mode_specific: { title: "Learn", content: "Good for learning", confidence: "high", sources: [] },
+    };
+
+    useScoutStore.getState().addDeepDiveResultV2(mockResult);
+    expect(useScoutStore.getState().deepDiveResultsV2).toHaveLength(1);
+    expect(useScoutStore.getState().deepDiveResultsV2[0].repo_name).toBe("test/repo");
+
+    // V1 array should remain unaffected
+    expect(useScoutStore.getState().deepDiveResults).toHaveLength(0);
+  });
+
+  it("setSummaryV2 stores V2 summary", () => {
+    const mockSummary: ScoutSummaryV2 = {
+      takeaways: ["Great TypeScript repo", "Active community"],
+      recommendation: {
+        repo: "test/repo",
+        repo_url: "https://github.com/test/repo",
+        reason: "Best for learning",
+        mode: "learn",
+      },
+      comparative_matrix: {
+        dimensions: ["stars", "activity"],
+        repos: [{ repo_name: "test/repo", values: { stars: "500", activity: "high" } }],
+      },
+      skills_roadmap: [{ step: 1, skill: "TypeScript", description: "Learn basics" }],
+      ecosystem_gaps: [{ gap: "Testing tools", opportunity: "Build a test helper" }],
+      ai_ecosystem_notes: "No AI usage detected",
+    };
+
+    useScoutStore.getState().setSummaryV2(mockSummary);
+    expect(useScoutStore.getState().summaryV2).not.toBeNull();
+    expect(useScoutStore.getState().summaryV2!.takeaways).toHaveLength(2);
+    expect(useScoutStore.getState().summaryV2!.recommendation.repo).toBe("test/repo");
+
+    // V1 summary should remain unaffected
+    expect(useScoutStore.getState().summary).toBeNull();
+  });
+
+  it("setDeepDivePageReady tracks navigation readiness", () => {
+    expect(useScoutStore.getState().deepDivePageReady).toBe(false);
+    useScoutStore.getState().setDeepDivePageReady(true);
+    expect(useScoutStore.getState().deepDivePageReady).toBe(true);
+  });
+
+  it("reset clears V2 state", () => {
+    useScoutStore.getState().setDeepDivePageReady(true);
+    useScoutStore.getState().setSummaryV2({
+      takeaways: ["test"],
+      recommendation: { repo: "r", repo_url: "u", reason: "r", mode: "learn" },
+      comparative_matrix: { dimensions: [], repos: [] },
+      skills_roadmap: [],
+      ecosystem_gaps: [],
+      ai_ecosystem_notes: "",
+    });
+
+    useScoutStore.getState().reset();
+
+    const state = useScoutStore.getState();
+    expect(state.deepDiveResultsV2).toEqual([]);
+    expect(state.summaryV2).toBeNull();
+    expect(state.deepDivePageReady).toBe(false);
   });
 });
 
