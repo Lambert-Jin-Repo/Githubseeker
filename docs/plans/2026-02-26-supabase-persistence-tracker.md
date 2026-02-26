@@ -69,6 +69,30 @@
 
 ---
 
+## Phase 7: Search Discovery — Wide Net (COMPLETE)
+
+**Completed:** 2026-02-26
+**Design:** `docs/plans/2026-02-26-search-wide-net-design.md`
+**Plan:** `docs/plans/2026-02-26-search-wide-net-plan.md`
+
+| # | Task | Status | Files |
+|---|---|---|---|
+| 1 | Expand mode detection triggers + vague query handling | `done` | `lib/mode-detection.ts`, `lib/__tests__/mode-detection.test.ts` |
+| 2 | Bump Serper default from 10 → 20 results | `done` | `lib/web-search.ts`, `lib/__tests__/web-search.test.ts` |
+| 3 | 6-strategy parallel prompt + verify 8-12 repos | `done` | `app/api/scout/route.ts` |
+| 4 | Adaptive maxToolRounds (10 vague / 8 specific) | `done` | `app/api/scout/route.ts` |
+| 5 | SSE strategy detection for direct_discovery + github_topics | `done` | `app/api/scout/route.ts` |
+| 6 | Full test suite verification | `done` | 84/84 tests passing |
+| 7 | Update tracker and memory | `done` | `PROJECT-TRACKER.md`, `MEMORY.md` |
+
+**Commits:** `a8aeb39`, `3f7e194`, `c4f3844`
+
+**Summary:** 6 search strategies (was 4), 20 results per query (was 10), explicit parallel execution instruction in prompt, vague query "broad discovery" mode, verify 8-12 repos (was 5-8), adaptive tool rounds (10 for vague / 8 for specific), 17 new trigger words for mode detection.
+
+**Expected impact:** ~120 raw results per search (was ~40), popular repos much less likely to be missed, vague queries get broad exploration instead of competitive-landscape default.
+
+---
+
 ## Tests
 
-77/77 passing (12 test files), TypeScript compiles clean
+84/84 passing (12 test files), TypeScript compiles clean
