@@ -60,35 +60,36 @@ export function RepoRow({ repo, index }: RepoRowProps) {
     <>
       <TableRow
         className={cn(
-          "animate-slide-up cursor-pointer transition-colors",
+          "animate-slide-up transition-colors cursor-pointer hover:bg-muted/50",
           isSelected && "bg-teal/[0.03]",
           delayClass
         )}
-        onClick={() => setExpanded(!expanded)}
-        aria-expanded={expanded}
+        onClick={() => toggleRepoSelection(repo.repo_url)}
+        aria-selected={isSelected}
         role="row"
       >
-        <TableCell className="w-10">
+        <TableCell className="w-12 pr-0">
           <Checkbox
             checked={isSelected}
             disabled={isMaxSelected}
             onCheckedChange={() => toggleRepoSelection(repo.repo_url)}
             onClick={(e) => e.stopPropagation()}
             aria-label={`Select ${repo.repo_name} for deep dive`}
+            className="data-[state=checked]:bg-teal data-[state=checked]:border-teal"
           />
         </TableCell>
 
-        <TableCell className="max-w-[200px]">
+        <TableCell className="min-w-[220px]">
           <div className="flex items-center gap-2">
             <a
               href={repo.repo_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 truncate font-mono text-sm font-medium text-foreground hover:text-teal transition-colors"
+              className="inline-flex items-center gap-1.5 font-mono text-base font-semibold text-foreground hover:text-teal transition-colors break-words"
               onClick={(e) => e.stopPropagation()}
             >
-              {repo.repo_name}
-              <ExternalLink className="size-3 shrink-0 opacity-40" aria-hidden="true" />
+              <span className="break-all">{repo.repo_name}</span>
+              <ExternalLink className="size-3.5 shrink-0 opacity-40 hover:opacity-100" aria-hidden="true" />
             </a>
           </div>
         </TableCell>
@@ -145,18 +146,27 @@ export function RepoRow({ repo, index }: RepoRowProps) {
           />
         </TableCell>
 
-        <TableCell className="max-w-[240px]">
-          <p className="truncate text-sm text-muted-foreground">
+        <TableCell className="min-w-[320px]">
+          <p className="text-sm text-muted-foreground leading-relaxed">
             {repo.summary}
           </p>
         </TableCell>
 
-        <TableCell className="w-8">
-          {expanded ? (
-            <ChevronUp className="size-4 text-muted-foreground" aria-hidden="true" />
-          ) : (
-            <ChevronDown className="size-4 text-muted-foreground" aria-hidden="true" />
-          )}
+        <TableCell className="w-10">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded(!expanded);
+            }}
+            className="p-2 hover:bg-secondary rounded-md transition-colors"
+            aria-label="Toggle details"
+          >
+            {expanded ? (
+              <ChevronUp className="size-4 text-muted-foreground" aria-hidden="true" />
+            ) : (
+              <ChevronDown className="size-4 text-muted-foreground" aria-hidden="true" />
+            )}
+          </button>
         </TableCell>
       </TableRow>
 

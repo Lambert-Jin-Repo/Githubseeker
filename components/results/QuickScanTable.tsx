@@ -190,7 +190,7 @@ export function QuickScanTable() {
             className={cn(
               "text-xs",
               tierFilter === tier &&
-                "bg-teal text-white hover:bg-teal/90"
+              "bg-teal text-white hover:bg-teal/90"
             )}
             onClick={() =>
               setTierFilter(tierFilter === tier ? null : tier)
@@ -239,25 +239,26 @@ export function QuickScanTable() {
       </div>
 
       {/* Desktop table — hidden on mobile */}
-      <div className="hidden md:block rounded-lg border border-border/60 bg-card">
+      <div className="hidden md:block rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-muted/30">
             <TableRow className="hover:bg-transparent">
-              <TableHead className="w-10" />
-              <TableHead className="text-xs font-medium">Repository</TableHead>
-              <SortableHead label="Stars" sortKeyName="stars" />
-              <SortableHead label="Last Active" sortKeyName="last_commit" />
-              <TableHead className="text-xs font-medium">Language</TableHead>
+              <TableHead className="w-12 pr-0" />
+              <TableHead className="text-sm font-semibold text-foreground">Repository</TableHead>
+              <SortableHead label="Stars" sortKeyName="stars" className="text-sm font-semibold" />
+              <SortableHead label="Last Active" sortKeyName="last_commit" className="text-sm font-semibold" />
+              <TableHead className="text-sm font-semibold text-foreground">Language</TableHead>
               <SortableHead
                 label="Quality"
                 sortKeyName="quality_tier"
+                className="text-sm font-semibold"
               />
-              <TableHead className="text-xs font-medium">
+              <TableHead className="text-sm font-semibold text-foreground">
                 Verification
               </TableHead>
-              <TableHead className="text-xs font-medium">Reddit</TableHead>
-              <TableHead className="text-xs font-medium">Summary</TableHead>
-              <TableHead className="w-8" />
+              <TableHead className="text-sm font-semibold text-foreground">Reddit</TableHead>
+              <TableHead className="text-sm font-semibold text-foreground">Summary</TableHead>
+              <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
           <TableBody>
