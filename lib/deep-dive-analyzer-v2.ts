@@ -435,6 +435,7 @@ export function buildFallbackResultV2(repoUrl: string): DeepDiveResultV2 {
 interface AgentEcosystemRaw {
   fileUrls: Array<{ type: string; url: string; path: string }>;
   fileContents: Map<string, string>;
+  // TODO: trending tools search deferred to next iteration
   trendingResults: Array<{ title: string; url: string; description: string }>;
 }
 
@@ -489,7 +490,7 @@ async function batchSearchAgentEcosystem(
       });
     }
 
-    // Fetch discovered file contents in parallel (max 5 files total)
+    // Fetch discovered file contents in parallel (max 3 files per repo)
     const fetchPromises: Array<Promise<void>> = [];
     for (const [, data] of result) {
       for (const file of data.fileUrls.slice(0, 3)) {

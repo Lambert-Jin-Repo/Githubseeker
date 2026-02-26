@@ -191,6 +191,7 @@ describe("V2 deep dive state", () => {
         confidence: "high",
         sources: [],
       },
+      agent_ecosystem: { discovered_files: [], ecosystem_mapping: { cursor: { has_config: false, rules_count: 0 }, claude: { has_skills: false, has_mcp: false }, other_agents: [] }, trending_tools: [], confidence: "low", sources: [] },
       mode_specific: { title: "Learn", content: "Good for learning", confidence: "high", sources: [] },
     };
 
