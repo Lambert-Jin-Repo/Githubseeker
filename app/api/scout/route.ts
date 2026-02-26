@@ -3,7 +3,10 @@ import { v4 as uuidv4 } from "uuid";
 import { callLLMWithTools } from "@/lib/llm";
 import { detectMode } from "@/lib/mode-detection";
 import { normalizeGitHubUrl, deduplicateRepos } from "@/lib/url-normalize";
-import { createServerClient, getSessionUserId } from "@/lib/supabase";
+import { createServerClient, getSessionUserId, getSessionUserIdFromAuth } from "@/lib/supabase";
+import { createAuthServerClient } from "@/lib/supabase/server";
+import { checkAnonymousRateLimit } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/auth";
 import { analyzeRepoV2 } from "@/lib/deep-dive-analyzer-v2";
 import type {
   ScoutMode,
@@ -182,10 +185,30 @@ export async function POST(request: NextRequest) {
 
     const trimmedQuery = query.trim();
 
+    // Determine if user is authenticated
+    const authClient = await createAuthServerClient();
+    const userId = await getSessionUserIdFromAuth(request, authClient);
+    const isAuthenticated = userId !== "anonymous" && userId !== getSessionUserId(request);
+
+    // Rate limit anonymous users
+    if (!isAuthenticated) {
+      const ip = getClientIp(request.headers);
+      const rateLimit = await checkAnonymousRateLimit(ip);
+      if (!rateLimit.allowed) {
+        return NextResponse.json(
+          {
+            error: "rate_limited",
+            message: "You've used your 2 free searches. Sign in with Google to unlock unlimited searches.",
+            remaining: 0,
+          },
+          { status: 429 }
+        );
+      }
+    }
+
     // Check for cached results (same user + query within last 24 hours)
     if (!force_refresh) {
       try {
-        const userId = getSessionUserId(request);
         const supabase = createServerClient();
         const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
@@ -218,7 +241,6 @@ export async function POST(request: NextRequest) {
 
     // Persist to Supabase (awaited to ensure row exists before GET handler updates it)
     try {
-      const userId = getSessionUserId(request);
       const supabase = createServerClient();
       const { error } = await supabase.from("searches").insert({
         id: searchId,
