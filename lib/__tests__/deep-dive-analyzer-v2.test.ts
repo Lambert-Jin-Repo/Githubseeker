@@ -95,4 +95,56 @@ describe("analyzeRepoV2", () => {
     expect(result.repo_url).toBe("https://github.com/test/repo");
     expect(result.overview.confidence).toBe("low");
   });
+
+  it("includes agent_ecosystem data when batch search finds files", async () => {
+    mockedWebSearch.mockResolvedValue([
+      {
+        title: ".cursorrules - test/repo",
+        url: "https://github.com/test/repo/blob/main/.cursorrules",
+        description: "Cursor rules for this project",
+      },
+    ]);
+    mockedFetchWebPage.mockResolvedValue("Use TypeScript strict mode\nPrefer functional patterns");
+
+    // Group C mock should return agent_ecosystem with discovered data
+    mockedLLM.mockResolvedValue(JSON.stringify({
+      overview: { title: "Overview", content: "Test", confidence: "high", sources: [] },
+      why_it_stands_out: { title: "Why", content: "Unique", confidence: "high", sources: [] },
+      tech_stack: { languages: ["TS"], frameworks: [], infrastructure: [], key_dependencies: [], confidence: "high", sources: [] },
+      architecture: { title: "Arch", content: "MVC", confidence: "medium", sources: [] },
+      code_quality: { has_tests: false, test_framework: null, has_ci: false, ci_platform: null, ci_config_url: null, has_linting: false, linter: null, typescript_strict: null, code_coverage_mentioned: false, build_system: null, confidence: "low", sources: [] },
+      community_health: { open_issues: null, closed_issues: null, contributors: null, last_commit_days_ago: null, has_contributing_guide: false, has_code_of_conduct: false, bus_factor_estimate: "low", confidence: "low", sources: [] },
+      documentation_quality: { readme_sections: [], has_docs_directory: false, has_api_docs: false, api_docs_type: null, has_examples: false, has_changelog: false, has_tutorials: false, overall_grade: "minimal", confidence: "low", sources: [] },
+      security_posture: { has_security_policy: false, has_env_example: false, env_vars_documented: false, license_type: "Unknown", license_commercial_friendly: false, known_vulnerabilities_mentioned: false, auth_patterns: [], confidence: "low", sources: [] },
+      ai_patterns: { has_ai_components: true, sdks_detected: [], agent_architecture: null, skill_files: [".cursorrules"], mcp_usage: false, prompt_engineering: { has_system_prompts: false, has_few_shot: false, prompt_location: null }, confidence: "high", summary: "Has cursor rules", sources: [] },
+      skills_required: { technical: ["TypeScript"], design: [], domain: [] },
+      agent_ecosystem: {
+        discovered_files: [{ type: "cursorrules", path: ".cursorrules", url: "https://github.com/test/repo/blob/main/.cursorrules", summary: "TypeScript strict mode and functional patterns" }],
+        ecosystem_mapping: { cursor: { has_config: true, rules_count: 2 }, claude: { has_skills: false, has_mcp: false }, other_agents: [] },
+        trending_tools: [],
+        confidence: "high",
+        sources: [],
+      },
+      getting_started: { prerequisites: [], install_commands: [], first_run_command: null, env_setup_steps: [], common_pitfalls: [], estimated_setup_time: null, confidence: "low", sources: [] },
+      mode_specific: { title: "Insights", content: "N/A", confidence: "low", sources: [] },
+      stars: 500, contributors: null, license: "MIT", primary_language: "TypeScript", last_updated: "2026-02-20",
+    }));
+
+    const result = await analyzeRepoV2("https://github.com/test/repo", "search-123");
+
+    expect(result.agent_ecosystem.discovered_files).toHaveLength(1);
+    expect(result.agent_ecosystem.discovered_files[0].type).toBe("cursorrules");
+    expect(result.agent_ecosystem.ecosystem_mapping.cursor.has_config).toBe(true);
+    expect(mockedWebSearch).toHaveBeenCalled();
+  });
+
+  it("handles batch search failure gracefully", async () => {
+    mockedWebSearch.mockRejectedValue(new Error("Serper rate limit"));
+
+    const result = await analyzeRepoV2("https://github.com/test/repo", "search-123");
+
+    expect(result.agent_ecosystem).toBeDefined();
+    expect(result.agent_ecosystem.discovered_files).toEqual([]);
+    expect(result.repo_url).toBe("https://github.com/test/repo");
+  });
 });
