@@ -1,83 +1,53 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { SearchHistoryItem } from "@/lib/types";
+import { createServerClient, getSessionUserId } from "@/lib/supabase";
 
-// In-memory storage keyed by session ID (temporary until Supabase is connected)
-const historyStore = new Map<string, SearchHistoryItem[]>();
-
-const SESSION_COOKIE_NAME = "github_scout_session";
 const MAX_HISTORY_ITEMS = 20;
-
-function getSessionId(request: NextRequest): string | null {
-  const cookie = request.cookies.get(SESSION_COOKIE_NAME);
-  return cookie?.value ?? null;
-}
 
 /** GET /api/history — Return recent searches for the current session */
 export async function GET(request: NextRequest) {
-  const sessionId = getSessionId(request);
+  const userId = getSessionUserId(request);
 
-  if (!sessionId) {
+  if (userId === "anonymous") {
     return NextResponse.json({ items: [] });
   }
 
-  const items = historyStore.get(sessionId) ?? [];
+  const db = createServerClient();
 
-  // Return most recent first, limited to MAX_HISTORY_ITEMS
-  const sorted = [...items]
-    .sort(
-      (a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    )
-    .slice(0, MAX_HISTORY_ITEMS);
+  const { data: searches, error } = await db
+    .from("searches")
+    .select("id, query, mode, phase2_complete, created_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(MAX_HISTORY_ITEMS);
 
-  return NextResponse.json({ items: sorted });
-}
-
-/** POST /api/history — Add a search to history */
-export async function POST(request: NextRequest) {
-  try {
-    const sessionId = getSessionId(request);
-
-    if (!sessionId) {
-      return NextResponse.json(
-        { error: "No session found" },
-        { status: 400 }
-      );
-    }
-
-    const body = await request.json();
-    const { id, query, mode, repos_found, phase2_complete } = body;
-
-    if (!id || !query || !mode) {
-      return NextResponse.json(
-        { error: "id, query, and mode are required" },
-        { status: 400 }
-      );
-    }
-
-    const item: SearchHistoryItem = {
-      id,
-      query,
-      mode,
-      repos_found: repos_found ?? 0,
-      created_at: new Date().toISOString(),
-      phase2_complete: phase2_complete ?? false,
-    };
-
-    const existing = historyStore.get(sessionId) ?? [];
-
-    // Prevent duplicate entries by search ID
-    const filtered = existing.filter((h) => h.id !== id);
-    filtered.unshift(item);
-
-    // Cap at MAX_HISTORY_ITEMS
-    historyStore.set(sessionId, filtered.slice(0, MAX_HISTORY_ITEMS));
-
-    return NextResponse.json({ success: true });
-  } catch {
-    return NextResponse.json(
-      { error: "Invalid request body" },
-      { status: 400 }
-    );
+  if (error) {
+    console.error("Failed to load history:", error);
+    return NextResponse.json({ items: [] });
   }
+
+  // Get repo counts per search
+  const searchIds = searches.map((s: { id: string }) => s.id);
+  const { data: counts, error: countError } = await db
+    .from("search_results")
+    .select("search_id")
+    .in("search_id", searchIds);
+
+  const repoCountMap = new Map<string, number>();
+  if (!countError && counts) {
+    for (const row of counts) {
+      const current = repoCountMap.get(row.search_id) || 0;
+      repoCountMap.set(row.search_id, current + 1);
+    }
+  }
+
+  const items = searches.map((s: { id: string; query: string; mode: string; phase2_complete: boolean; created_at: string }) => ({
+    id: s.id,
+    query: s.query,
+    mode: s.mode,
+    repos_found: repoCountMap.get(s.id) || 0,
+    created_at: s.created_at,
+    phase2_complete: s.phase2_complete || false,
+  }));
+
+  return NextResponse.json({ items });
 }
