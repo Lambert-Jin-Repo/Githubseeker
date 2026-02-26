@@ -159,7 +159,7 @@ export async function POST(
           const summaryResponse = await callLLMWithTools({
             systemPrompt,
             userMessage,
-            maxToolRounds: 2,
+            maxToolRounds: 0,
           });
 
           const summaryJsonStr = extractJSON(summaryResponse);

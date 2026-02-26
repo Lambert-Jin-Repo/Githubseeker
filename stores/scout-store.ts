@@ -132,7 +132,12 @@ export const useScoutStore = create<ScoutStore>((set) => ({
   setPhase2Complete: (v) => set({ phase2Complete: v }),
 
   addDeepDiveResultV2: (result) =>
-    set((s) => ({ deepDiveResultsV2: [...s.deepDiveResultsV2, result] })),
+    set((s) => ({
+      deepDiveResultsV2: [
+        ...s.deepDiveResultsV2.filter((r) => r.repo_url !== result.repo_url),
+        result,
+      ],
+    })),
   setSummaryV2: (summary) => set({ summaryV2: summary }),
   setDeepDivePageReady: (ready) => set({ deepDivePageReady: ready }),
 

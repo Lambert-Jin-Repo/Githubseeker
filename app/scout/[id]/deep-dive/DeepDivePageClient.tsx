@@ -119,9 +119,6 @@ export function DeepDivePageClient({ searchId }: DeepDivePageClientProps) {
     return items;
   }, [repoUrls]);
 
-  // Check which repos have completed analysis
-  const completedUrls = new Set(deepDiveResultsV2.map((r) => r.repo_url));
-
   // Phase label for progress indicator
   const phaseLabel = {
     idle: "",
