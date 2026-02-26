@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import type { ChatCompletionTool } from "openai/resources/chat/completions";
-import { webSearch, fetchWebPage } from "./web-search";
+import { webSearch, fetchWebPage, fetchGitHubMetadata } from "./web-search";
 
 const client = new OpenAI({
   apiKey: process.env.MINIMAX_API_KEY!,
@@ -13,7 +13,7 @@ const SCOUT_TOOLS: ChatCompletionTool[] = [
     function: {
       name: "web_search",
       description:
-        "Search the web for information. Use for discovering GitHub repos, checking Reddit, finding articles.",
+        "Search the web for information. Use for discovering GitHub repos and finding articles.",
       parameters: {
         type: "object",
         properties: {
@@ -32,7 +32,7 @@ const SCOUT_TOOLS: ChatCompletionTool[] = [
     function: {
       name: "web_fetch",
       description:
-        "Fetch the content of a web page. Use for verifying GitHub repos exist and extracting metadata.",
+        "Fetch a web page. For top-level GitHub repo URLs (github.com/owner/repo), returns structured JSON with stars, language, license, description, topics, and last commit. For other URLs, returns raw HTML.",
       parameters: {
         type: "object",
         properties: {
@@ -57,7 +57,13 @@ async function executeToolCall(
       return JSON.stringify(results);
     }
     case "web_fetch": {
-      const content = await fetchWebPage(args.url as string);
+      const url = args.url as string;
+      // Route top-level GitHub repo URLs through metadata extraction (~300B vs 50KB)
+      if (/^https?:\/\/github\.com\/[^/]+\/[^/]+\/?$/.test(url)) {
+        const meta = await fetchGitHubMetadata(url);
+        return JSON.stringify(meta);
+      }
+      const content = await fetchWebPage(url);
       return content;
     }
     default:
@@ -118,26 +124,36 @@ export async function callLLMWithTools(
       return message.content || "";
     }
 
-    for (const toolCall of message.tool_calls) {
-      if (toolCall.type !== "function") continue;
-      const args = JSON.parse(toolCall.function.arguments);
-      onToolCall?.(toolCall.function.name, args);
+    // Execute all tool calls in parallel for concurrency
+    const functionCalls = message.tool_calls.filter(tc => tc.type === "function");
+    for (const tc of functionCalls) {
+      onToolCall?.(tc.function.name, JSON.parse(tc.function.arguments));
+    }
 
-      let result: string;
-      try {
-        result = await executeToolCall(toolCall.function.name, args);
-      } catch (err) {
-        const toolError = err instanceof Error ? err : new Error("Tool execution failed");
-        onToolError?.(toolCall.function.name, toolError);
-        result = JSON.stringify({
-          error: toolError.message,
-        });
-      }
-      onToolResult?.(toolCall.function.name, result);
+    const results = await Promise.allSettled(
+      functionCalls.map(async (tc) => {
+        const args = JSON.parse(tc.function.arguments);
+        try {
+          return await executeToolCall(tc.function.name, args);
+        } catch (err) {
+          const toolError = err instanceof Error ? err : new Error("Tool execution failed");
+          onToolError?.(tc.function.name, toolError);
+          return JSON.stringify({ error: toolError.message });
+        }
+      })
+    );
 
+    // Push tool results in order, preserving message sequence
+    for (let i = 0; i < functionCalls.length; i++) {
+      const tc = functionCalls[i];
+      const settled = results[i];
+      const result = settled.status === "fulfilled"
+        ? settled.value
+        : JSON.stringify({ error: "Tool execution failed" });
+      onToolResult?.(tc.function.name, result);
       messages.push({
         role: "tool",
-        tool_call_id: toolCall.id,
+        tool_call_id: tc.id,
         content: result,
       });
     }

@@ -20,27 +20,24 @@ function buildSystemPrompt(mode: ScoutMode): string {
 Your job is to discover, verify, and evaluate open-source GitHub repositories for a given topic.
 
 ## Your Tools
-- web_search: Search the web using Brave Search
-- web_fetch: Fetch a web page's content
+- web_search: Search the web using Google
+- web_fetch: Fetch a web page. For GitHub repo URLs (github.com/owner/repo), returns structured JSON with stars, language, license, description, topics, and last commit date. For other URLs, returns raw HTML.
 
 ## Phase 1 Discovery Workflow
 
-Execute these search strategies in order:
+Execute these 4 search strategies:
 
 1. **High-star repos**: Search "site:github.com {topic} stars" to find popular repositories
 2. **Awesome lists**: Search "site:github.com awesome-{topic}" to find curated lists
-3. **Topic pages**: Search "site:github.com/topics {topic}" for GitHub topic pages
-4. **Editorial roundups**: Search "best open source {topic} 2025 2026" for expert reviews
-5. **AI/skill patterns**: Search "{topic} AI agent skill cursor rules github" for AI-related repos
-${mode === "SCOUT" ? '6. **Competitive landscape**: Search "{topic} open source alternatives 2025 2026"' : `6. **Architecture patterns**: Search "{topic} system design architecture github"`}
+3. **Editorial roundups**: Search "best open source {topic} 2025 2026" for expert reviews
+${mode === "SCOUT" ? '4. **Competitive landscape**: Search "{topic} open source alternatives 2025 2026"' : `4. **Architecture patterns**: Search "{topic} system design architecture github"`}
 
 ## Verification Requirements
 
-For EVERY repository you find:
-1. Fetch the actual GitHub page using web_fetch to verify it exists
-2. Extract real metadata from the page (stars, language, license, last commit)
-3. Do NOT fabricate or guess any data — mark as "unverified" if you cannot confirm
-4. Search Reddit for community sentiment on Tier 1 repos: "{repo_name} reddit recommendations"
+- Use web_fetch to verify the **top 5-8** most promising repos (Tier 1 candidates). web_fetch on a GitHub repo URL returns structured JSON metadata — no need to parse HTML yourself.
+- For remaining repos, use metadata from search snippets and mark verification level as "inferred".
+- Do NOT fabricate or guess star counts, dates, or other data.
+- Do NOT search Reddit — community analysis is handled by the deep dive phase.
 
 ## Quality Tier Assignment
 - Tier 1 (★★★): >1000 stars, active within 6 months, strong community signal
@@ -62,7 +59,7 @@ After all searches and verifications, return a JSON object with this exact struc
       "primary_language": "TypeScript",
       "license": "MIT",
       "quality_tier": 1,
-      "reddit_signal": "validated",
+      "reddit_signal": "no_data",
       "summary": "One-line description of what this repo does and why it matters",
       "source_strategies": ["high_star", "awesome_list"],
       "verification": {
@@ -72,7 +69,7 @@ After all searches and verifications, return a JSON object with this exact struc
         "language": { "value": "TypeScript", "level": "verified" },
         "license": { "value": "MIT", "level": "verified" },
         "freshness": { "status": "active", "level": "verified" },
-        "community": { "signal": "validated", "level": "verified" }
+        "community": { "signal": "no_data", "level": "inferred" }
       }
     }
   ],
@@ -88,7 +85,7 @@ IMPORTANT:
 - Return ONLY the JSON object, no markdown code fences, no extra text
 - Aim for 15-25 repos total across all strategies
 - Deduplicate by repository URL
-- Be thorough in your searches but respect the tool call budget`;
+- Be efficient: batch web_fetch calls, do not verify every single repo`;
 }
 
 function buildUserMessage(query: string, mode: ScoutMode): string {
@@ -318,11 +315,9 @@ export async function GET(request: NextRequest) {
             let strategy = "general";
             if (searchQuery.includes("stars") || searchQuery.includes("popular")) strategy = "high_star";
             else if (searchQuery.includes("awesome")) strategy = "awesome_list";
-            else if (searchQuery.includes("topic")) strategy = "topic_page";
             else if (searchQuery.includes("best") || searchQuery.includes("roundup")) strategy = "editorial";
             else if (searchQuery.includes("architecture") || searchQuery.includes("design")) strategy = "architecture";
             else if (searchQuery.includes("alternative")) strategy = "competitive";
-            else if (searchQuery.includes("AI") || searchQuery.includes("agent") || searchQuery.includes("skill")) strategy = "ai_patterns";
 
             if (!strategiesSeen.has(strategy)) {
               strategiesSeen.add(strategy);
@@ -370,7 +365,7 @@ export async function GET(request: NextRequest) {
             }
           }
         },
-        maxToolRounds: 12,
+        maxToolRounds: 8,
       })
         .then(async (finalResponse) => {
           // Parse the JSON response from LLM
