@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { FeedbackSignal } from "@/lib/types";
+import { createServerClient } from "@/lib/supabase";
 
 const VALID_SIGNALS: FeedbackSignal[] = ["useful", "not_useful", "inaccurate"];
 
@@ -36,8 +37,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // TODO: Persist to Supabase once schema is ready
-    // For now, just acknowledge the feedback
+    // Persist to Supabase
+    const db = createServerClient();
+    const { error: dbError } = await db.from("feedback").insert({
+      search_id,
+      repo_url,
+      signal,
+      ...(comment ? { comment } : {}),
+    });
+
+    if (dbError) {
+      console.error("Failed to save feedback:", dbError);
+      return NextResponse.json(
+        { error: "Failed to save feedback" },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json(
