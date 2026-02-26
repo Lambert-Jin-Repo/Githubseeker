@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useScoutStore } from "@/stores/scout-store";
+import { getOrCreateSessionId } from "@/lib/session";
 
 export function useScoutStream(searchId: string | null) {
   const [isConnected, setIsConnected] = useState(false);
@@ -189,6 +190,7 @@ export function useScoutStream(searchId: string | null) {
     if (!query) return;
 
     try {
+      getOrCreateSessionId();
       const res = await fetch("/api/scout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

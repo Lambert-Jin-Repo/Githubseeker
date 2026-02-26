@@ -8,6 +8,7 @@ import { SearchInput } from "@/components/search/SearchInput";
 import { ModeIndicator } from "@/components/search/ModeIndicator";
 import { ExampleQueries } from "@/components/search/ExampleQueries";
 import { detectMode } from "@/lib/mode-detection";
+import { getOrCreateSessionId } from "@/lib/session";
 import type { ScoutMode } from "@/lib/types";
 
 export default function HomePage() {
@@ -33,6 +34,8 @@ export default function HomePage() {
     async (searchQuery: string) => {
       setIsLoading(true);
       try {
+        // Ensure session cookie exists before making the request
+        getOrCreateSessionId();
         const mode = detectedMode || "SCOUT";
         const res = await fetch("/api/scout", {
           method: "POST",
