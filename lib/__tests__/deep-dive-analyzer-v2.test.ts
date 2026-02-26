@@ -39,6 +39,7 @@ describe("analyzeRepoV2", () => {
       readmeContent: "# Test Repo\nA test project",
       treeContent: "<html>file tree</html>",
       depsContent: '{"name": "test", "dependencies": {"react": "^19.0.0"}}',
+      ciConfigContent: null,
       communityResults: [],
     });
 

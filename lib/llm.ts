@@ -91,6 +91,16 @@ export async function callLLMWithTools(
     { role: "user", content: userMessage },
   ];
 
+  // Pure completion mode — no tools, no exhaustion message
+  if (maxToolRounds === 0) {
+    const response = await client.chat.completions.create({
+      model: "MiniMax-M2.5",
+      max_tokens: 16384,
+      messages,
+    });
+    return response.choices[0]?.message?.content || "";
+  }
+
   for (let round = 0; round < maxToolRounds; round++) {
     const response = await client.chat.completions.create({
       model: "MiniMax-M2.5",

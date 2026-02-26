@@ -9,6 +9,7 @@ export interface RawRepoData {
   readmeContent: string | null;
   treeContent: string | null;
   depsContent: string | null;
+  ciConfigContent: string | null;
   communityResults: WebSearchResult[];
 }
 
@@ -36,7 +37,7 @@ async function safeSearch(query: string): Promise<WebSearchResult[]> {
 export async function fetchRepoData(repoUrl: string): Promise<RawRepoData> {
   const { owner, repo } = extractOwnerRepo(repoUrl);
 
-  const [repoPageHtml, readmeContent, treeContent, depsContent, communityResults] =
+  const [repoPageHtml, readmeContent, treeContent, depsContent, ciConfigContent, communityResults] =
     await Promise.all([
       safeFetch(repoUrl),
       safeFetch(`https://raw.githubusercontent.com/${owner}/${repo}/HEAD/README.md`),
@@ -44,11 +45,17 @@ export async function fetchRepoData(repoUrl: string): Promise<RawRepoData> {
       safeFetch(`https://raw.githubusercontent.com/${owner}/${repo}/HEAD/package.json`)
         .then(async (r) => {
           if (r) return r;
-          return (
-            (await safeFetch(`https://raw.githubusercontent.com/${owner}/${repo}/HEAD/requirements.txt`)) ||
-            (await safeFetch(`https://raw.githubusercontent.com/${owner}/${repo}/HEAD/go.mod`)) ||
-            (await safeFetch(`https://raw.githubusercontent.com/${owner}/${repo}/HEAD/Cargo.toml`))
-          );
+          const [reqsTxt, goMod, cargoToml] = await Promise.all([
+            safeFetch(`https://raw.githubusercontent.com/${owner}/${repo}/HEAD/requirements.txt`),
+            safeFetch(`https://raw.githubusercontent.com/${owner}/${repo}/HEAD/go.mod`),
+            safeFetch(`https://raw.githubusercontent.com/${owner}/${repo}/HEAD/Cargo.toml`),
+          ]);
+          return reqsTxt || goMod || cargoToml;
+        }),
+      safeFetch(`https://raw.githubusercontent.com/${owner}/${repo}/HEAD/.github/workflows/ci.yml`)
+        .then(async (r) => {
+          if (r) return r;
+          return safeFetch(`https://raw.githubusercontent.com/${owner}/${repo}/HEAD/.github/workflows/ci.yaml`);
         }),
       safeSearch(`${owner}/${repo} github review OR comparison OR alternatives`),
     ]);
@@ -61,6 +68,7 @@ export async function fetchRepoData(repoUrl: string): Promise<RawRepoData> {
     readmeContent,
     treeContent,
     depsContent,
+    ciConfigContent,
     communityResults,
   };
 }
@@ -80,6 +88,7 @@ export async function fetchAllReposData(repoUrls: string[]): Promise<RawRepoData
           readmeContent: null,
           treeContent: null,
           depsContent: null,
+          ciConfigContent: null,
           communityResults: [],
         }
   );

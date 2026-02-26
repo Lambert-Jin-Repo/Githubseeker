@@ -24,8 +24,8 @@ describe("fetchRepoData", () => {
 
     expect(result.repoUrl).toBe("https://github.com/vercel/next.js");
     expect(result.repoPageHtml).toBe("<html>mock page</html>");
-    // Should have called fetchWebPage for repo page, README, tree, and dep file
-    expect(mockedFetch).toHaveBeenCalledTimes(4);
+    // Should have called fetchWebPage for repo page, README, tree, dep file, and CI config
+    expect(mockedFetch).toHaveBeenCalledTimes(5);
     // Should have called webSearch for community context
     expect(mockedSearch).toHaveBeenCalledTimes(1);
   });
@@ -41,6 +41,7 @@ describe("fetchRepoData", () => {
     expect(result.readmeContent).toBeNull();
     expect(result.treeContent).toBeNull();
     expect(result.depsContent).toBeNull();
+    expect(result.ciConfigContent).toBeNull();
     expect(result.communityResults).toEqual([]);
   });
 

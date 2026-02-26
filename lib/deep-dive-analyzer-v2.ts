@@ -40,6 +40,10 @@ function buildDataContext(data: RawRepoData): string {
     sections.push(`\n## Repo Page HTML (truncated to 6000 chars)\n${data.repoPageHtml.slice(0, 6000)}`);
   }
 
+  if (data.ciConfigContent) {
+    sections.push(`\n## CI Config Content (truncated to 4000 chars)\n${data.ciConfigContent.slice(0, 4000)}`);
+  }
+
   if (data.communityResults.length > 0) {
     sections.push(`\n## Community Search Results\n${JSON.stringify(data.communityResults.slice(0, 5), null, 2)}`);
   }
@@ -387,7 +391,7 @@ export async function analyzeRepoV2(
 
     const result: DeepDiveResultV2 = {
       repo_url: repoUrl,
-      repo_name: typeof parsedA.repo_name === "string" ? parsedA.repo_name : repoUrl.replace("https://github.com/", ""),
+      repo_name: `${data.owner}/${data.repo}`,
       stars: typeof parsedA.stars === "number" ? parsedA.stars : 0,
       contributors: typeof parsedA.contributors === "number" ? parsedA.contributors : null,
       license: typeof parsedA.license === "string" ? parsedA.license : "Unknown",
@@ -488,7 +492,8 @@ Return a JSON object with this EXACT structure (no markdown fences, no extra tex
 
 function safeParseJSON(text: string): Record<string, unknown> {
   try {
-    const cleaned = extractJSON(text);
+    const stripped = text.replace(/<think>[\s\S]*?<\/think>/g, "");
+    const cleaned = extractJSON(stripped);
     return JSON.parse(cleaned) as Record<string, unknown>;
   } catch {
     return {};
@@ -540,7 +545,13 @@ export function parseSummaryV2(raw: Record<string, unknown>): ScoutSummaryV2 {
         const o = r as Record<string, unknown>;
         return {
           repo_name: typeof o.repo_name === "string" ? o.repo_name : "",
-          values: o.values && typeof o.values === "object" ? (o.values as Record<string, string>) : {},
+          values: o.values && typeof o.values === "object"
+            ? Object.fromEntries(
+                Object.entries(o.values as Record<string, unknown>)
+                  .filter(([, v]) => typeof v === "string")
+                  .map(([k, v]) => [k, v as string])
+              )
+            : {},
         };
       }) : [],
     },
