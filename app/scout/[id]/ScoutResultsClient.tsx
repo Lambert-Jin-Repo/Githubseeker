@@ -1,9 +1,8 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useScoutStream } from "@/hooks/useScoutStream";
-import { useDeepDiveStream } from "@/hooks/useDeepDiveStream";
 import { useScoutStore } from "@/stores/scout-store";
 import { Header } from "@/components/shared/Header";
 import { SearchMetaBar } from "@/components/results/SearchMetaBar";
@@ -13,8 +12,6 @@ import { ObservationsPanel } from "@/components/results/ObservationsPanel";
 import { CuratedListsSection } from "@/components/results/CuratedListsSection";
 import { IndustryToolsSection } from "@/components/results/IndustryToolsSection";
 import { DeepDiveCTA } from "@/components/results/DeepDiveCTA";
-import { DeepDiveCard } from "@/components/deep-dive/DeepDiveCard";
-import { SummaryPanel } from "@/components/deep-dive/SummaryPanel";
 import { ExportButton } from "@/components/export/ExportButton";
 import { SearchLoadingScreen } from "@/components/results/SearchLoadingScreen";
 import { SearchSkeleton } from "@/components/shared/LoadingSkeleton";
@@ -26,21 +23,16 @@ interface ScoutResultsClientProps {
 
 export function ScoutResultsClient({ searchId }: ScoutResultsClientProps) {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const isCached = searchParams.get("cached") === "true";
   const { error, isLoadingSaved, retrySearch } = useScoutStream(searchId);
-  const { startDeepDive, isStreaming: isDeepDiving, progress, error: deepDiveError } = useDeepDiveStream(searchId);
-  const deepDiveRef = useRef<HTMLDivElement>(null);
 
   const repos = useScoutStore((s) => s.repos);
   const searchMeta = useScoutStore((s) => s.searchMeta);
   const phase1Complete = useScoutStore((s) => s.phase1Complete);
   const curatedLists = useScoutStore((s) => s.curatedLists);
   const industryTools = useScoutStore((s) => s.industryTools);
-  const mode = useScoutStore((s) => s.mode);
   const selectedRepoUrls = useScoutStore((s) => s.selectedRepoUrls);
-  const deepDiveResults = useScoutStore((s) => s.deepDiveResults);
-  const summary = useScoutStore((s) => s.summary);
-  const phase2Complete = useScoutStore((s) => s.phase2Complete);
 
   // Cinematic transition state
   const [isContracting, setIsContracting] = useState(false);
@@ -85,16 +77,10 @@ export function ScoutResultsClient({ searchId }: ScoutResultsClientProps) {
   }, [isLoadingSaved, phase1Complete, isCached]);
 
   const handleDeepDive = () => {
-    startDeepDive(selectedRepoUrls);
-    // Wait for React to render the deep dive section, then scroll
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        deepDiveRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
-    });
+    router.push(`/scout/${searchId}/deep-dive`);
   };
 
-  const activeError = error || deepDiveError;
+  const activeError = error;
 
   // Determine what to show
   const showLoadingScreen = !showResults && !isLoadingSaved && !phase1Complete;
@@ -195,7 +181,6 @@ export function ScoutResultsClient({ searchId }: ScoutResultsClientProps) {
             <div className="flex justify-end">
               <ExportButton
                 repos={repos}
-                deepDiveResults={deepDiveResults.length > 0 ? deepDiveResults : undefined}
                 query={searchMeta?.query || ""}
               />
             </div>
@@ -222,38 +207,6 @@ export function ScoutResultsClient({ searchId }: ScoutResultsClientProps) {
             </div>
           )}
 
-          {/* Deep Dive Results */}
-          {(isDeepDiving || deepDiveResults.length > 0) && (
-            <div ref={deepDiveRef} className="space-y-6 pt-4 scroll-mt-6">
-              <h2 className="font-serif text-3xl text-foreground">
-                Deep Dive Analysis
-              </h2>
-              {isDeepDiving && progress.total > 0 && (
-                <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
-                  Analyzing {progress.completed} of {progress.total} repositories...
-                </p>
-              )}
-              {isDeepDiving && deepDiveResults.length === 0 && (
-                <div className="flex items-center gap-3 rounded-lg border border-teal/20 bg-teal/5 px-5 py-4 text-sm text-muted-foreground animate-pulse-soft">
-                  <Loader2 className="size-4 animate-spin text-teal" aria-hidden="true" />
-                  Starting deep analysis...
-                </div>
-              )}
-              {deepDiveResults.map((result, index) => (
-                <DeepDiveCard
-                  key={result.repo_url}
-                  result={result}
-                  mode={mode || "SCOUT"}
-                  index={index}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Summary Panel */}
-          {summary && phase2Complete && (
-            <SummaryPanel summary={summary} mode={mode || "SCOUT"} />
-          )}
         </main>
       )}
 
