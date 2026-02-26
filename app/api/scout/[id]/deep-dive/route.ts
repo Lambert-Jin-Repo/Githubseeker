@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callLLMWithTools } from "@/lib/llm";
+import { createServerClient } from "@/lib/supabase";
 import type {
   DeepDiveResult,
   DeepDiveSection,
@@ -411,6 +412,22 @@ Fetch the repo page, read the README, check dependencies, and identify AI patter
 
             deepDiveResults.push(result);
             send("deep_dive_complete", result);
+
+              // Persist deep dive to Supabase
+              try {
+                const db = createServerClient();
+                const { error: upsertError } = await db
+                  .from("search_results")
+                  .update({ deep_dive: result })
+                  .eq("search_id", id)
+                  .eq("repo_url", repoUrl);
+
+                if (upsertError) {
+                  console.error("Failed to save deep dive:", upsertError);
+                }
+              } catch (e) {
+                console.error("Deep dive persist error:", e);
+              }
           } catch (err) {
             // If a single repo fails, create a minimal result and continue
             const fallbackResult: DeepDiveResult = {
@@ -443,6 +460,18 @@ Fetch the repo page, read the README, check dependencies, and identify AI patter
             deepDiveResults.push(fallbackResult);
             send("deep_dive_complete", fallbackResult);
 
+              // Persist fallback deep dive to Supabase
+              try {
+                const db = createServerClient();
+                await db
+                  .from("search_results")
+                  .update({ deep_dive: fallbackResult })
+                  .eq("search_id", id)
+                  .eq("repo_url", repoUrl);
+              } catch (e) {
+                console.error("Fallback deep dive persist error:", e);
+              }
+
             send("error", {
               message: `Failed to analyze ${repoUrl}: ${err instanceof Error ? err.message : "Unknown error"}`,
               recoverable: true,
@@ -466,6 +495,17 @@ Fetch the repo page, read the README, check dependencies, and identify AI patter
           const summary = parseSummary(summaryParsed);
 
           send("summary", summary);
+
+            // Mark phase2 complete in Supabase
+            try {
+              const db = createServerClient();
+              await db
+                .from("searches")
+                .update({ phase2_complete: true })
+                .eq("id", id);
+            } catch (e) {
+              console.error("Phase2 complete persist error:", e);
+            }
         } catch {
           // Provide a minimal summary if generation fails
           const fallbackSummary: ScoutSummary = {
@@ -476,6 +516,16 @@ Fetch the repo page, read the README, check dependencies, and identify AI patter
             ai_ecosystem_notes: "Summary generation failed. Review individual repo analyses above.",
           };
           send("summary", fallbackSummary);
+
+            try {
+              const db = createServerClient();
+              await db
+                .from("searches")
+                .update({ phase2_complete: true })
+                .eq("id", id);
+            } catch (e) {
+              console.error("Phase2 complete persist error:", e);
+            }
         }
 
         controller.close();
