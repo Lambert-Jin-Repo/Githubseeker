@@ -16,6 +16,7 @@ import { ExportButton } from "@/components/export/ExportButton";
 import { SearchLoadingScreen } from "@/components/results/SearchLoadingScreen";
 import { SearchSkeleton } from "@/components/shared/LoadingSkeleton";
 import { AlertCircle, Loader2, RefreshCw } from "lucide-react";
+import { useSearchNotificationStore } from "@/stores/search-notification-store";
 
 interface ScoutResultsClientProps {
   searchId: string;
@@ -26,6 +27,12 @@ export function ScoutResultsClient({ searchId }: ScoutResultsClientProps) {
   const router = useRouter();
   const isCached = searchParams.get("cached") === "true";
   const { error, isLoadingSaved, retrySearch } = useScoutStream(searchId);
+
+  // Dismiss the global search notification when results page loads
+  const dismissNotification = useSearchNotificationStore((s) => s.dismiss);
+  useEffect(() => {
+    dismissNotification();
+  }, [dismissNotification]);
 
   const repos = useScoutStore((s) => s.repos);
   const searchMeta = useScoutStore((s) => s.searchMeta);

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { GlobalSearchStatus } from "./GlobalSearchStatus";
 
 export function Header() {
   return (
@@ -21,13 +22,14 @@ export function Header() {
               Scout
             </span>
           </Link>
-          <nav aria-label="Main navigation" className="flex items-center gap-6">
+          <nav aria-label="Main navigation" className="flex items-center gap-4">
             <Link
               href="/history"
               className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               History
             </Link>
+            <GlobalSearchStatus />
           </nav>
         </div>
       </header>
