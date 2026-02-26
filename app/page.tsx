@@ -13,13 +13,16 @@ import { detectMode } from "@/lib/mode-detection";
 import { getOrCreateSessionId } from "@/lib/session";
 import { useSearchNotificationStore } from "@/stores/search-notification-store";
 import { useScoutStore } from "@/stores/scout-store";
+import { useAuth } from "@/hooks/useAuth";
 import type { ScoutMode } from "@/lib/types";
 
 export default function HomePage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [query, setQuery] = useState("");
   const [detectedMode, setDetectedMode] = useState<ScoutMode | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [rateLimited, setRateLimited] = useState(false);
 
   const notifStatus = useSearchNotificationStore((s) => s.status);
   const startSearch = useSearchNotificationStore((s) => s.startSearch);
@@ -40,15 +43,22 @@ export default function HomePage() {
   const handleSubmit = useCallback(
     async (searchQuery: string) => {
       setIsLoading(true);
+      setRateLimited(false);
       try {
-        // Ensure session cookie exists before making the request
-        getOrCreateSessionId();
+        // Only create anonymous session cookie if user is not authenticated
+        if (!user) {
+          getOrCreateSessionId();
+        }
         const mode = detectedMode || "SCOUT";
         const res = await fetch("/api/scout", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ query: searchQuery, mode }),
         });
+        if (res.status === 429) {
+          setRateLimited(true);
+          return;
+        }
         const data = await res.json();
         if (data.id) {
           if (data.cached) {
@@ -67,7 +77,7 @@ export default function HomePage() {
         setIsLoading(false);
       }
     },
-    [detectedMode, router, startSearch]
+    [detectedMode, router, startSearch, user]
   );
 
   const handleExample = useCallback((exampleQuery: string) => {
@@ -111,6 +121,29 @@ export default function HomePage() {
               onOverride={setDetectedMode}
             />
           </div>
+
+          {/* Rate limit prompt */}
+          {rateLimited && (
+            <div className="w-full rounded-lg border border-amber-200 bg-amber-50 p-4 text-center">
+              <p className="text-sm text-amber-800">
+                You&rsquo;ve used your 2 free searches. Sign in with Google to unlock unlimited searches and track your history.
+              </p>
+              <button
+                onClick={() => {
+                  import("@/lib/supabase/client").then(({ createBrowserClient }) => {
+                    const supabase = createBrowserClient();
+                    supabase.auth.signInWithOAuth({
+                      provider: "google",
+                      options: { redirectTo: `${window.location.origin}/auth/callback` },
+                    });
+                  });
+                }}
+                className="mt-3 inline-flex items-center gap-2 rounded-md bg-teal px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-teal/90"
+              >
+                Sign in with Google
+              </button>
+            </div>
+          )}
 
           {/* Center notification — replaces auto-navigation */}
           {isSearchActive && <SearchProgressNotification />}
