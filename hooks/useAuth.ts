@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import type { User } from "@supabase/supabase-js";
+import type { User, AuthChangeEvent, Session } from "@supabase/supabase-js";
 import type { OAuthProvider } from "@/lib/auth";
 
 export function useAuth() {
@@ -12,14 +12,14 @@ export function useAuth() {
   useEffect(() => {
     const supabase = createBrowserClient();
 
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user ?? null);
+    supabase.auth.getUser().then((response: { data: { user: User | null } }) => {
+      setUser(response.data.user ?? null);
       setLoading(false);
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       setUser(session?.user ?? null);
       setLoading(false);
     });
