@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import { ArrowUpDown, Filter, X } from "lucide-react";
+import { ArrowUpDown, Filter, X, ExternalLink, Star } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,8 +19,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { RepoRow } from "./RepoRow";
 import { RepoRowSkeleton } from "@/components/shared/LoadingSkeleton";
+import { VerificationBadge } from "./VerificationBadge";
+import { QualityTierBadge } from "./QualityTierBadge";
 import { useScoutStore } from "@/stores/scout-store";
-import { getOverallVerificationStatus } from "@/lib/verification";
+import { getOverallVerificationStatus, formatStarCount, formatRelativeDate } from "@/lib/verification";
 import type { QualityTier, RepoResult } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -122,6 +124,7 @@ export function QuickScanTable() {
       <button
         className="inline-flex items-center gap-1 text-xs font-medium hover:text-foreground transition-colors"
         onClick={() => toggleSort(sortKeyName)}
+        aria-label={`Sort by ${label}, currently ${sortKey === sortKeyName ? sortDir + "ending" : "unsorted"}`}
       >
         {label}
         <ArrowUpDown
@@ -131,15 +134,22 @@ export function QuickScanTable() {
               ? "text-teal"
               : "text-muted-foreground/50"
           )}
+          aria-hidden="true"
         />
       </button>
     </TableHead>
   );
 
+  const clearAllFilters = useCallback(() => {
+    setLanguageFilter(null);
+    setTierFilter(null);
+    setVerifiedOnly(false);
+  }, []);
+
   return (
     <div className="space-y-3">
       {/* Filter bar */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label="Filter repositories">
         {/* Language dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -150,8 +160,9 @@ export function QuickScanTable() {
                 "gap-1.5 text-xs",
                 languageFilter && "border-teal/40 text-teal"
               )}
+              aria-label={languageFilter ? `Filtering by ${languageFilter}` : "Filter by language"}
             >
-              <Filter className="size-3" />
+              <Filter className="size-3" aria-hidden="true" />
               {languageFilter ?? "Language"}
             </Button>
           </DropdownMenuTrigger>
@@ -184,6 +195,8 @@ export function QuickScanTable() {
             onClick={() =>
               setTierFilter(tierFilter === tier ? null : tier)
             }
+            aria-label={`Filter by Tier ${tier}`}
+            aria-pressed={tierFilter === tier}
           >
             {"\u2605".repeat(4 - tier)} Tier {tier}
           </Button>
@@ -198,6 +211,8 @@ export function QuickScanTable() {
             verifiedOnly && "bg-teal text-white hover:bg-teal/90"
           )}
           onClick={() => setVerifiedOnly(!verifiedOnly)}
+          aria-label="Show verified repositories only"
+          aria-pressed={verifiedOnly}
         >
           Verified only
         </Button>
@@ -208,26 +223,23 @@ export function QuickScanTable() {
             variant="ghost"
             size="xs"
             className="gap-1 text-xs text-muted-foreground"
-            onClick={() => {
-              setLanguageFilter(null);
-              setTierFilter(null);
-              setVerifiedOnly(false);
-            }}
+            onClick={clearAllFilters}
+            aria-label="Clear all filters"
           >
-            <X className="size-3" />
+            <X className="size-3" aria-hidden="true" />
             Clear
           </Button>
         )}
 
         {hasActiveFilters && (
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs text-muted-foreground" aria-live="polite">
             {filteredAndSorted.length} of {repos.length} repos
           </span>
         )}
       </div>
 
-      {/* Table */}
-      <div className="rounded-lg border border-border/60 bg-card">
+      {/* Desktop table — hidden on mobile */}
+      <div className="hidden md:block rounded-lg border border-border/60 bg-card">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
@@ -289,16 +301,128 @@ export function QuickScanTable() {
               variant="link"
               size="sm"
               className="mt-1 text-teal"
-              onClick={() => {
-                setLanguageFilter(null);
-                setTierFilter(null);
-                setVerifiedOnly(false);
-              }}
+              onClick={clearAllFilters}
             >
               Clear all filters
             </Button>
           </div>
         )}
+      </div>
+
+      {/* Mobile card layout — shown only on mobile */}
+      <div className="md:hidden space-y-3">
+        {filteredAndSorted.map((repo) => (
+          <MobileRepoCard key={repo.repo_url} repo={repo} />
+        ))}
+
+        {/* Skeleton cards during loading */}
+        {isSearching &&
+          !phase1Complete &&
+          repos.length === 0 &&
+          Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={`skel-mobile-${i}`}
+              className="animate-shimmer rounded-lg border border-border/60 bg-card p-4 h-32"
+            />
+          ))}
+
+        {/* Empty state */}
+        {!isSearching && repos.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <p className="font-serif text-lg text-muted-foreground">
+              No repositories found
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground/70">
+              Try adjusting your search query or filters
+            </p>
+          </div>
+        )}
+
+        {/* Filtered empty state */}
+        {repos.length > 0 && filteredAndSorted.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <p className="text-sm text-muted-foreground">
+              No repos match current filters
+            </p>
+            <Button
+              variant="link"
+              size="sm"
+              className="mt-1 text-teal"
+              onClick={clearAllFilters}
+            >
+              Clear all filters
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Mobile card view for individual repos                               */
+/* ------------------------------------------------------------------ */
+function MobileRepoCard({ repo }: { repo: RepoResult }) {
+  const toggleRepoSelection = useScoutStore((s) => s.toggleRepoSelection);
+  const selectedRepoUrls = useScoutStore((s) => s.selectedRepoUrls);
+
+  const isSelected = selectedRepoUrls.includes(repo.repo_url);
+  const isMaxSelected = selectedRepoUrls.length >= 5 && !isSelected;
+
+  return (
+    <div
+      className={cn(
+        "rounded-lg border border-border/60 bg-card p-4 space-y-3 animate-slide-up",
+        isSelected && "border-teal/40 bg-teal/[0.03]"
+      )}
+    >
+      {/* Top row: checkbox + repo name */}
+      <div className="flex items-start gap-3">
+        <Checkbox
+          checked={isSelected}
+          disabled={isMaxSelected}
+          onCheckedChange={() => toggleRepoSelection(repo.repo_url)}
+          aria-label={`Select ${repo.repo_name} for deep dive`}
+          className="mt-1 shrink-0"
+        />
+        <div className="min-w-0 flex-1">
+          <a
+            href={repo.repo_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 font-mono text-sm font-medium text-foreground hover:text-teal transition-colors"
+          >
+            <span className="truncate">{repo.repo_name}</span>
+            <ExternalLink className="size-3 shrink-0 opacity-40" aria-hidden="true" />
+          </a>
+          {repo.summary && (
+            <p className="mt-1 text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+              {repo.summary}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Stats row */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+        {repo.stars !== null && (
+          <div className="flex items-center gap-1">
+            <Star className="size-3 fill-amber text-amber" aria-hidden="true" />
+            <span>{formatStarCount(repo.stars)}</span>
+          </div>
+        )}
+        {repo.last_commit && (
+          <span>{formatRelativeDate(repo.last_commit)}</span>
+        )}
+        {repo.primary_language && (
+          <span>{repo.primary_language}</span>
+        )}
+      </div>
+
+      {/* Badges row */}
+      <div className="flex flex-wrap items-center gap-2">
+        <QualityTierBadge tier={repo.quality_tier} />
+        <VerificationBadge verification={repo.verification} />
       </div>
     </div>
   );

@@ -63,6 +63,8 @@ export function RepoRow({ repo, index }: RepoRowProps) {
           delayClass
         )}
         onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
+        role="row"
       >
         <TableCell className="w-10">
           <Checkbox
@@ -84,7 +86,7 @@ export function RepoRow({ repo, index }: RepoRowProps) {
               onClick={(e) => e.stopPropagation()}
             >
               {repo.repo_name}
-              <ExternalLink className="size-3 shrink-0 opacity-40" />
+              <ExternalLink className="size-3 shrink-0 opacity-40" aria-hidden="true" />
             </a>
           </div>
         </TableCell>
@@ -92,7 +94,7 @@ export function RepoRow({ repo, index }: RepoRowProps) {
         <TableCell>
           {repo.stars !== null ? (
             <div className="flex items-center gap-1 text-sm text-muted-foreground">
-              <Star className="size-3.5 fill-amber text-amber" />
+              <Star className="size-3.5 fill-amber text-amber" aria-hidden="true" />
               {formatStarCount(repo.stars)}
             </div>
           ) : (
@@ -149,9 +151,9 @@ export function RepoRow({ repo, index }: RepoRowProps) {
 
         <TableCell className="w-8">
           {expanded ? (
-            <ChevronUp className="size-4 text-muted-foreground" />
+            <ChevronUp className="size-4 text-muted-foreground" aria-hidden="true" />
           ) : (
-            <ChevronDown className="size-4 text-muted-foreground" />
+            <ChevronDown className="size-4 text-muted-foreground" aria-hidden="true" />
           )}
         </TableCell>
       </TableRow>

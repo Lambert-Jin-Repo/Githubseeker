@@ -47,7 +47,8 @@ export function SearchInput({ onSubmit, isLoading, defaultValue = "" }: SearchIn
         <button
           onClick={handleSubmit}
           disabled={query.trim().length < 3 || isLoading}
-          className="mr-2.5 flex h-9 w-9 items-center justify-center rounded-xl bg-teal text-teal-foreground transition-all duration-200 hover:bg-teal/90 disabled:opacity-30 disabled:cursor-not-allowed"
+          aria-label={isLoading ? "Searching..." : "Submit search"}
+          className="mr-2.5 flex h-10 w-10 items-center justify-center rounded-xl bg-teal text-teal-foreground transition-all duration-200 hover:bg-teal/90 disabled:opacity-30 disabled:cursor-not-allowed"
         >
           {isLoading ? (
             <Loader2 className="h-4 w-4 animate-spin" />

@@ -32,9 +32,9 @@ export function StreamingProgress() {
 
   if (phase1Complete) {
     return (
-      <div className="animate-slide-up mx-auto max-w-6xl px-6 py-3">
+      <div className="animate-slide-up mx-auto max-w-6xl px-4 py-3 sm:px-6" role="status" aria-live="polite">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Check className="size-4 text-success" />
+          <Check className="size-4 text-success" aria-hidden="true" />
           <span>
             Scan complete &mdash;{" "}
             <span className="font-medium text-foreground">
@@ -48,7 +48,7 @@ export function StreamingProgress() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-4">
+    <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6" role="status" aria-live="polite">
       <div className="flex flex-wrap items-center gap-2">
         {searchProgress.map((progress, idx) => {
           const isRunning = progress.status === "running";

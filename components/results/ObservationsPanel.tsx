@@ -13,12 +13,12 @@ export function ObservationsPanel() {
     <Card className="animate-slide-up border-border/60">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
-          <Lightbulb className="size-4 text-amber" />
+          <Lightbulb className="size-4 text-amber" aria-hidden="true" />
           <span className="font-serif">Observations</span>
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-3">
+        <div className="space-y-3" aria-live="polite">
           {observations.map((obs, idx) => (
             <p
               key={idx}

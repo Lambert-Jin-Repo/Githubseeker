@@ -59,11 +59,11 @@ export default function HomePage() {
   return (
     <>
       <Header />
-      <main className="flex flex-1 flex-col items-center justify-center px-6">
-        <div className="flex w-full max-w-2xl flex-col items-center gap-8 py-24">
+      <main id="main-content" className="flex flex-1 flex-col items-center justify-center px-4 sm:px-6">
+        <div className="flex w-full max-w-2xl flex-col items-center gap-8 py-12 sm:py-24">
           {/* Hero heading */}
           <div className="text-center space-y-3 animate-slide-up">
-            <h1 className="font-serif text-5xl md:text-6xl tracking-tight text-foreground">
+            <h1 className="font-serif text-3xl sm:text-5xl md:text-6xl tracking-tight text-foreground">
               Discover what&rsquo;s been built
             </h1>
             <p className="text-lg text-muted-foreground font-sans max-w-md mx-auto leading-relaxed">
@@ -94,21 +94,22 @@ export default function HomePage() {
           </div>
 
           {/* How it works */}
-          <div className="w-full pt-8 animate-slide-up delay-6">
-            <div className="grid grid-cols-3 gap-6">
+          <section className="w-full pt-8 animate-slide-up delay-6" aria-labelledby="how-it-works-heading">
+            <h2 id="how-it-works-heading" className="sr-only">How it works</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               {[
                 { step: "01", title: "Search", desc: "Describe what you're looking for in plain language" },
                 { step: "02", title: "Discover", desc: "AI searches multiple strategies and verifies every result" },
                 { step: "03", title: "Deep Dive", desc: "Get architecture analysis, AI patterns, and recommendations" },
               ].map((item) => (
                 <div key={item.step} className="text-center space-y-2">
-                  <span className="text-xs font-mono font-medium text-teal tracking-wider">{item.step}</span>
+                  <span className="text-xs font-mono font-medium text-teal tracking-wider" aria-hidden="true">{item.step}</span>
                   <h3 className="font-serif text-lg text-foreground">{item.title}</h3>
                   <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
                 </div>
               ))}
             </div>
-          </div>
+          </section>
         </div>
       </main>
       <Footer />

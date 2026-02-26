@@ -47,11 +47,11 @@ export function ScoutResultsClient({ searchId }: ScoutResultsClientProps) {
       <Header />
       <SearchMetaBar />
 
-      <main className="mx-auto max-w-6xl px-6 py-6 space-y-8">
+      <main id="main-content" className="mx-auto max-w-6xl px-4 py-6 space-y-8 sm:px-6">
         {/* Error banner */}
         {activeError && (
-          <div className="animate-slide-up flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-            <AlertCircle className="size-4 shrink-0" />
+          <div role="alert" className="animate-slide-up flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
             {activeError}
           </div>
         )}
@@ -67,7 +67,7 @@ export function ScoutResultsClient({ searchId }: ScoutResultsClientProps) {
           </div>
 
           {/* Right: Sidebar */}
-          <aside className="space-y-6">
+          <aside className="space-y-6" aria-label="Search insights">
             <ObservationsPanel />
             {curatedLists.length > 0 && <CuratedListsSection />}
             {industryTools.length > 0 && <IndustryToolsSection />}
@@ -81,7 +81,7 @@ export function ScoutResultsClient({ searchId }: ScoutResultsClientProps) {
               Deep Dive Analysis
             </h2>
             {isDeepDiving && progress.total > 0 && (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
                 Analyzing {progress.completed} of {progress.total} repositories...
               </p>
             )}

@@ -69,12 +69,14 @@ function CollapsibleSection({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex w-full items-center gap-2 py-1 text-left transition-colors hover:text-teal"
+        className="flex w-full items-center gap-2 py-2 text-left transition-colors hover:text-teal min-h-[44px]"
+        aria-expanded={isOpen}
+        aria-label={`${isOpen ? "Collapse" : "Expand"} ${title} section`}
       >
         {isOpen ? (
-          <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+          <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         ) : (
-          <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         )}
         <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
           {title}
@@ -130,32 +132,33 @@ export function DeepDiveCard({ result, mode, index }: DeepDiveCardProps) {
       <CardHeader className="pb-2">
         <div className="space-y-3">
           {/* Repo name and link */}
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start justify-between gap-2 sm:gap-4">
             <a
               href={result.repo_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="group inline-flex items-center gap-2"
+              className="group inline-flex items-center gap-2 min-w-0"
+              aria-label={`${result.repo_name} — open on GitHub`}
             >
-              <h3 className="font-serif text-2xl text-foreground transition-colors group-hover:text-teal">
+              <h3 className="font-serif text-xl sm:text-2xl text-foreground transition-colors group-hover:text-teal break-words">
                 {result.repo_name}
               </h3>
-              <ExternalLink className="size-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+              <ExternalLink className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" aria-hidden="true" />
             </a>
           </div>
 
           {/* Meta row */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground sm:gap-x-4">
             {/* Stars */}
             <div className="flex items-center gap-1">
-              <Star className="size-3.5 fill-amber text-amber" />
+              <Star className="size-3.5 fill-amber text-amber" aria-hidden="true" />
               <span>{formatStarCount(result.stars)}</span>
             </div>
 
             {/* Contributors */}
             {result.contributors !== null && (
               <div className="flex items-center gap-1">
-                <Users className="size-3.5" />
+                <Users className="size-3.5" aria-hidden="true" />
                 <span>
                   {result.contributors.toLocaleString()} contributor
                   {result.contributors !== 1 ? "s" : ""}
@@ -171,6 +174,7 @@ export function DeepDiveCard({ result, mode, index }: DeepDiveCardProps) {
                     "inline-block size-2.5 rounded-full",
                     getLanguageDotClass(result.primary_language)
                   )}
+                  aria-hidden="true"
                 />
                 <span>{result.primary_language}</span>
               </div>
@@ -179,7 +183,7 @@ export function DeepDiveCard({ result, mode, index }: DeepDiveCardProps) {
             {/* License */}
             {result.license && (
               <div className="flex items-center gap-1">
-                <Scale className="size-3.5" />
+                <Scale className="size-3.5" aria-hidden="true" />
                 <span>{result.license}</span>
               </div>
             )}
@@ -187,7 +191,7 @@ export function DeepDiveCard({ result, mode, index }: DeepDiveCardProps) {
             {/* Last updated */}
             {result.last_updated && (
               <div className="flex items-center gap-1">
-                <Clock className="size-3.5" />
+                <Clock className="size-3.5" aria-hidden="true" />
                 <span>Updated {formatRelativeDate(result.last_updated)}</span>
               </div>
             )}

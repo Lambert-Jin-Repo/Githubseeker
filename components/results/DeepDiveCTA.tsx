@@ -21,9 +21,9 @@ export function DeepDiveCTA({ onDeepDive }: DeepDiveCTAProps) {
   if (!phase1Complete && selectedCount === 0) return null;
 
   return (
-    <div className="fixed bottom-0 inset-x-0 z-50 border-t border-border/60 bg-white/95 backdrop-blur-md">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
-        <div className="text-sm text-muted-foreground">
+    <div className="fixed bottom-0 inset-x-0 z-50 border-t border-border/60 bg-white/95 backdrop-blur-md" role="region" aria-label="Deep dive selection">
+      <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="text-sm text-muted-foreground" aria-live="polite">
           {selectedCount > 0 ? (
             <>
               <span className="font-semibold text-foreground">
@@ -40,7 +40,7 @@ export function DeepDiveCTA({ onDeepDive }: DeepDiveCTAProps) {
           disabled={!isEnabled}
           onClick={onDeepDive}
           className={cn(
-            "gap-2 px-6 font-medium transition-all",
+            "gap-2 px-6 font-medium transition-all min-h-[44px]",
             isEnabled
               ? "bg-teal text-white hover:bg-teal/90 shadow-md shadow-teal/20"
               : "bg-muted text-muted-foreground"
@@ -48,13 +48,13 @@ export function DeepDiveCTA({ onDeepDive }: DeepDiveCTAProps) {
         >
           {isDeepDiving ? (
             <>
-              <Search className="size-4 animate-pulse-soft" />
+              <Search className="size-4 animate-pulse-soft" aria-hidden="true" />
               Analyzing...
             </>
           ) : (
             <>
               Deep Dive Selected ({selectedCount}/5)
-              <ArrowRight className="size-4" />
+              <ArrowRight className="size-4" aria-hidden="true" />
             </>
           )}
         </Button>
