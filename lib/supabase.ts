@@ -30,3 +30,21 @@ export function getSessionUserId(request: NextRequest): string {
   }
   return "anonymous";
 }
+
+/**
+ * Get user ID with Supabase Auth priority, cookie fallback.
+ */
+export async function getSessionUserIdFromAuth(
+  request: NextRequest,
+  authClient: SupabaseClient
+): Promise<string> {
+  try {
+    const { data: { user }, error } = await authClient.auth.getUser();
+    if (!error && user?.id) {
+      return user.id;
+    }
+  } catch {
+    // Auth check failed, fall through to cookie
+  }
+  return getSessionUserId(request);
+}

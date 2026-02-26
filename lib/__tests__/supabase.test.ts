@@ -48,3 +48,68 @@ describe("getSessionUserId", () => {
     expect(userId).toBe("anonymous");
   });
 });
+
+describe("getSessionUserIdFromAuth", () => {
+  it("returns auth user ID when Supabase session exists", async () => {
+    const { getSessionUserIdFromAuth } = await import("../supabase");
+    const request = {
+      cookies: {
+        get: () => undefined,
+      },
+    } as any;
+
+    const authClient = {
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: "auth-user-abc-123" } },
+          error: null,
+        }),
+      },
+    } as any;
+
+    const userId = await getSessionUserIdFromAuth(request, authClient);
+    expect(userId).toBe("auth-user-abc-123");
+  });
+
+  it("falls back to cookie when no auth session", async () => {
+    const { getSessionUserIdFromAuth } = await import("../supabase");
+    const request = {
+      cookies: {
+        get: (name: string) =>
+          name === "github_scout_session"
+            ? { value: "550e8400-e29b-41d4-a716-446655440000" }
+            : undefined,
+      },
+    } as any;
+
+    const authClient = {
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: null },
+          error: { message: "No session" },
+        }),
+      },
+    } as any;
+
+    const userId = await getSessionUserIdFromAuth(request, authClient);
+    expect(userId).toBe("550e8400-e29b-41d4-a716-446655440000");
+  });
+
+  it("falls back to 'anonymous' when auth fails and no cookie", async () => {
+    const { getSessionUserIdFromAuth } = await import("../supabase");
+    const request = {
+      cookies: {
+        get: () => undefined,
+      },
+    } as any;
+
+    const authClient = {
+      auth: {
+        getUser: vi.fn().mockRejectedValue(new Error("Network error")),
+      },
+    } as any;
+
+    const userId = await getSessionUserIdFromAuth(request, authClient);
+    expect(userId).toBe("anonymous");
+  });
+});
