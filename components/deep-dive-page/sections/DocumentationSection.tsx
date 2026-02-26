@@ -64,9 +64,9 @@ export function DocumentationSection({
               README Sections
             </span>
             <div className="flex flex-wrap gap-1.5">
-              {documentation.readme_sections.map((section) => (
+              {documentation.readme_sections.map((section, i) => (
                 <Badge
-                  key={section}
+                  key={`${section}-${i}`}
                   variant="outline"
                   className="text-xs font-normal border-border bg-muted/50 text-muted-foreground"
                 >
