@@ -7,7 +7,7 @@ const MAX_HISTORY_ITEMS = 20;
 /** GET /api/history — Return recent searches for the current session */
 export async function GET(request: NextRequest) {
   const authClient = await createAuthServerClient();
-  const userId = await getSessionUserIdFromAuth(request, authClient);
+  const { userId } = await getSessionUserIdFromAuth(request, authClient);
 
   if (userId === "anonymous") {
     return NextResponse.json({ items: [] });

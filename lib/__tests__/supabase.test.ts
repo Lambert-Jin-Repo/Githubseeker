@@ -67,8 +67,9 @@ describe("getSessionUserIdFromAuth", () => {
       },
     } as any;
 
-    const userId = await getSessionUserIdFromAuth(request, authClient);
-    expect(userId).toBe("auth-user-abc-123");
+    const result = await getSessionUserIdFromAuth(request, authClient);
+    expect(result.userId).toBe("auth-user-abc-123");
+    expect(result.isAuthenticated).toBe(true);
   });
 
   it("falls back to cookie when no auth session", async () => {
@@ -91,8 +92,9 @@ describe("getSessionUserIdFromAuth", () => {
       },
     } as any;
 
-    const userId = await getSessionUserIdFromAuth(request, authClient);
-    expect(userId).toBe("550e8400-e29b-41d4-a716-446655440000");
+    const result = await getSessionUserIdFromAuth(request, authClient);
+    expect(result.userId).toBe("550e8400-e29b-41d4-a716-446655440000");
+    expect(result.isAuthenticated).toBe(false);
   });
 
   it("falls back to 'anonymous' when auth fails and no cookie", async () => {
@@ -109,7 +111,8 @@ describe("getSessionUserIdFromAuth", () => {
       },
     } as any;
 
-    const userId = await getSessionUserIdFromAuth(request, authClient);
-    expect(userId).toBe("anonymous");
+    const result = await getSessionUserIdFromAuth(request, authClient);
+    expect(result.userId).toBe("anonymous");
+    expect(result.isAuthenticated).toBe(false);
   });
 });

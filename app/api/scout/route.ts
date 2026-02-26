@@ -187,8 +187,7 @@ export async function POST(request: NextRequest) {
 
     // Determine if user is authenticated
     const authClient = await createAuthServerClient();
-    const userId = await getSessionUserIdFromAuth(request, authClient);
-    const isAuthenticated = userId !== "anonymous";
+    const { userId, isAuthenticated } = await getSessionUserIdFromAuth(request, authClient);
 
     // Rate limit anonymous users
     if (!isAuthenticated) {

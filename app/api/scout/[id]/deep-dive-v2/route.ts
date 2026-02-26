@@ -27,7 +27,7 @@ export async function POST(
 
   // Verify the search belongs to the requesting user
   const authClient = await createAuthServerClient();
-  const userId = await getSessionUserIdFromAuth(request, authClient);
+  const { userId } = await getSessionUserIdFromAuth(request, authClient);
   const db = createServerClient();
   const { data: search } = await db
     .from("searches")

@@ -13,7 +13,7 @@ export async function GET(
   }
 
   const authClient = await createAuthServerClient();
-  const userId = await getSessionUserIdFromAuth(request, authClient);
+  const { userId } = await getSessionUserIdFromAuth(request, authClient);
   const db = createServerClient();
 
   // Fetch the search record (scoped to the requesting user)
