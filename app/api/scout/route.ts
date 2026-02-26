@@ -446,6 +446,9 @@ export async function GET(request: NextRequest) {
               verified,
               unverified: dedupedRepos.length - verified,
             });
+
+            // Close SSE stream immediately so the client gets phase1_complete without delay
+            safeClose();
           } catch (parseError) {
             console.error("[scout/GET] Parse error:", parseError);
             console.error("[scout/GET] Raw LLM response (first 2000 chars):", finalResponse.slice(0, 2000));
@@ -453,9 +456,10 @@ export async function GET(request: NextRequest) {
               message: "Failed to parse search results. The AI may have returned malformed data.",
               recoverable: true,
             });
+            safeClose();
           }
 
-          // Persist results to Supabase (after stream events are sent)
+          // Persist results to Supabase (after stream is closed)
           try {
             const supabase = createServerClient();
 
@@ -509,8 +513,6 @@ export async function GET(request: NextRequest) {
               console.error("[scout/GET] Background precompute failed:", err)
             );
           }
-
-          safeClose();
         })
         .catch((err) => {
           // If we already have some repos, send partial completion before the error
