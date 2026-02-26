@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { callLLMWithTools } from "@/lib/llm";
 import { detectMode } from "@/lib/mode-detection";
 import { normalizeGitHubUrl, deduplicateRepos } from "@/lib/url-normalize";
-import { createServerClient, getSessionUserId, getSessionUserIdFromAuth } from "@/lib/supabase";
+import { createServerClient, getSessionUserIdFromAuth } from "@/lib/supabase";
 import { createAuthServerClient } from "@/lib/supabase/server";
 import { checkAnonymousRateLimit } from "@/lib/rate-limit";
 import { getClientIp } from "@/lib/auth";
@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
     // Determine if user is authenticated
     const authClient = await createAuthServerClient();
     const userId = await getSessionUserIdFromAuth(request, authClient);
-    const isAuthenticated = userId !== "anonymous" && userId !== getSessionUserId(request);
+    const isAuthenticated = userId !== "anonymous";
 
     // Rate limit anonymous users
     if (!isAuthenticated) {
