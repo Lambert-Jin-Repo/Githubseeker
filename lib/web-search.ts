@@ -8,7 +8,7 @@ export interface WebSearchResult {
 
 export async function webSearch(
   query: string,
-  count: number = 10
+  count: number = 20
 ): Promise<WebSearchResult[]> {
   const response = await fetch(SERPER_API_URL, {
     method: "POST",
