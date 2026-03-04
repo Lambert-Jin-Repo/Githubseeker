@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 interface RepoRowProps {
   repo: RepoResult;
   index: number;
+  isKeyboardSelected?: boolean;
 }
 
 function getLanguageClass(language: string | null): string {
@@ -42,7 +43,7 @@ function getLanguageClass(language: string | null): string {
   return knownLangs.includes(key) ? `lang-${key}` : "lang-default";
 }
 
-export function RepoRow({ repo, index }: RepoRowProps) {
+export function RepoRow({ repo, index, isKeyboardSelected = false }: RepoRowProps) {
   const [expanded, setExpanded] = useState(false);
   const toggleRepoSelection = useScoutStore((s) => s.toggleRepoSelection);
   const selectedRepoUrls = useScoutStore((s) => s.selectedRepoUrls);
@@ -59,13 +60,16 @@ export function RepoRow({ repo, index }: RepoRowProps) {
   return (
     <>
       <TableRow
+        data-kb-index={index}
         className={cn(
           "animate-slide-up transition-colors cursor-pointer hover:bg-muted/50",
           isSelected && "bg-teal/[0.03]",
+          isKeyboardSelected && "ring-2 ring-teal/40 ring-inset bg-teal/[0.05]",
           delayClass
         )}
         onClick={() => setExpanded(!expanded)}
         aria-expanded={expanded}
+        aria-selected={isKeyboardSelected}
         role="row"
       >
         <TableCell className="w-12 pr-0">

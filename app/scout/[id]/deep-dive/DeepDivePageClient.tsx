@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useScoutStore } from "@/stores/scout-store";
 import { useDeepDiveStreamV2 } from "@/hooks/useDeepDiveStreamV2";
+import { useHotkeys } from "@/hooks/useHotkeys";
 import { DeepDiveHeader } from "@/components/deep-dive-page/DeepDiveHeader";
 import { DeepDiveSidebar } from "@/components/deep-dive-page/DeepDiveSidebar";
 import { SectionSkeleton } from "@/components/deep-dive-page/SectionSkeleton";
@@ -120,6 +121,82 @@ export function DeepDivePageClient({ searchId }: DeepDivePageClientProps) {
     return items;
   }, [repoUrls]);
 
+  // Keyboard navigation: j/k for repos, [/] for all sections
+  const [kbSidebarIndex, setKbSidebarIndex] = useState<number>(-1);
+
+  const scrollToSidebarItem = useCallback(
+    (index: number) => {
+      if (index < 0 || index >= sidebarItems.length) return;
+      const item = sidebarItems[index];
+      document.getElementById(item.id)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    },
+    [sidebarItems]
+  );
+
+  // j/k navigate between repo items only in the sidebar
+  const repoSidebarIndices = useMemo(
+    () =>
+      sidebarItems
+        .map((item, i) => (item.type === "repo" ? i : -1))
+        .filter((i) => i >= 0),
+    [sidebarItems]
+  );
+
+  useHotkeys(
+    {
+      j: () => {
+        setKbSidebarIndex((prev) => {
+          // Find next repo index
+          const currentRepoPos = repoSidebarIndices.indexOf(prev);
+          const nextPos =
+            currentRepoPos < 0
+              ? 0
+              : Math.min(currentRepoPos + 1, repoSidebarIndices.length - 1);
+          const nextIndex = repoSidebarIndices[nextPos];
+          if (nextIndex !== undefined) {
+            scrollToSidebarItem(nextIndex);
+            return nextIndex;
+          }
+          return prev;
+        });
+      },
+      k: () => {
+        setKbSidebarIndex((prev) => {
+          const currentRepoPos = repoSidebarIndices.indexOf(prev);
+          const prevPos =
+            currentRepoPos <= 0
+              ? 0
+              : currentRepoPos - 1;
+          const prevIndex = repoSidebarIndices[prevPos];
+          if (prevIndex !== undefined) {
+            scrollToSidebarItem(prevIndex);
+            return prevIndex;
+          }
+          return prev;
+        });
+      },
+      "[": () => {
+        setKbSidebarIndex((prev) => {
+          const nextIdx = prev <= 0 ? 0 : prev - 1;
+          scrollToSidebarItem(nextIdx);
+          return nextIdx;
+        });
+      },
+      "]": () => {
+        setKbSidebarIndex((prev) => {
+          const max = sidebarItems.length - 1;
+          const nextIdx = prev < 0 ? 0 : Math.min(prev + 1, max);
+          scrollToSidebarItem(nextIdx);
+          return nextIdx;
+        });
+      },
+    },
+    [sidebarItems, repoSidebarIndices, scrollToSidebarItem]
+  );
+
   // Phase label for progress indicator
   const phaseLabel = {
     idle: "",
@@ -139,7 +216,7 @@ export function DeepDivePageClient({ searchId }: DeepDivePageClientProps) {
       />
 
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:grid lg:grid-cols-[200px_1fr] lg:gap-8">
-        <DeepDiveSidebar items={sidebarItems} />
+        <DeepDiveSidebar items={sidebarItems} keyboardActiveIndex={kbSidebarIndex} />
 
         <motion.main
           className="space-y-8"

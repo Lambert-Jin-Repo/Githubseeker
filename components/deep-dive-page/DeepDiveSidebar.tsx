@@ -10,9 +10,11 @@ interface SidebarItem {
 
 interface DeepDiveSidebarProps {
   items: SidebarItem[];
+  /** Index of item highlighted via keyboard (j/k/[/]) — -1 = none */
+  keyboardActiveIndex?: number;
 }
 
-export function DeepDiveSidebar({ items }: DeepDiveSidebarProps) {
+export function DeepDiveSidebar({ items, keyboardActiveIndex = -1 }: DeepDiveSidebarProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
 
@@ -56,23 +58,26 @@ export function DeepDiveSidebar({ items }: DeepDiveSidebarProps) {
     });
   };
 
-  // Group items: pre-separator (overview, compare), repos, post-separator (gaps)
-  const preItems = items.filter(
-    (i) => i.type === "section" && i.id !== "gaps"
-  );
-  const repoItems = items.filter((i) => i.type === "repo");
-  const postItems = items.filter(
-    (i) => i.type === "section" && i.id === "gaps"
-  );
+  // Group items with their original indices for keyboard highlight tracking
+  const preItems = items
+    .map((item, i) => ({ item, originalIndex: i }))
+    .filter(({ item }) => item.type === "section" && item.id !== "gaps");
+  const repoItems = items
+    .map((item, i) => ({ item, originalIndex: i }))
+    .filter(({ item }) => item.type === "repo");
+  const postItems = items
+    .map((item, i) => ({ item, originalIndex: i }))
+    .filter(({ item }) => item.type === "section" && item.id === "gaps");
 
   return (
     <aside className="hidden lg:block" aria-label="Report navigation">
       <nav className="sticky top-16 space-y-1">
-        {preItems.map((item) => (
+        {preItems.map(({ item, originalIndex }) => (
           <SidebarButton
             key={item.id}
             item={item}
             isActive={activeId === item.id}
+            isKeyboardActive={originalIndex === keyboardActiveIndex}
             onClick={handleClick}
           />
         ))}
@@ -85,11 +90,12 @@ export function DeepDiveSidebar({ items }: DeepDiveSidebarProps) {
           />
         )}
 
-        {repoItems.map((item) => (
+        {repoItems.map(({ item, originalIndex }) => (
           <SidebarButton
             key={item.id}
             item={item}
             isActive={activeId === item.id}
+            isKeyboardActive={originalIndex === keyboardActiveIndex}
             onClick={handleClick}
           />
         ))}
@@ -102,11 +108,12 @@ export function DeepDiveSidebar({ items }: DeepDiveSidebarProps) {
           />
         )}
 
-        {postItems.map((item) => (
+        {postItems.map(({ item, originalIndex }) => (
           <SidebarButton
             key={item.id}
             item={item}
             isActive={activeId === item.id}
+            isKeyboardActive={originalIndex === keyboardActiveIndex}
             onClick={handleClick}
           />
         ))}
@@ -118,23 +125,26 @@ export function DeepDiveSidebar({ items }: DeepDiveSidebarProps) {
 function SidebarButton({
   item,
   isActive,
+  isKeyboardActive = false,
   onClick,
 }: {
   item: SidebarItem;
   isActive: boolean;
+  isKeyboardActive?: boolean;
   onClick: (id: string) => void;
 }) {
   const baseClasses =
     "block w-full truncate rounded-md px-3 py-1.5 text-left transition-colors";
   const activeClasses = "bg-teal/10 font-medium text-teal";
   const inactiveClasses = "text-muted-foreground hover:bg-muted";
+  const kbClasses = isKeyboardActive ? "ring-2 ring-teal/40" : "";
   const sizeClass = item.type === "repo" ? "text-xs" : "text-sm";
 
   return (
     <button
       type="button"
       onClick={() => onClick(item.id)}
-      className={`${baseClasses} ${sizeClass} ${isActive ? activeClasses : inactiveClasses}`}
+      className={`${baseClasses} ${sizeClass} ${isActive ? activeClasses : inactiveClasses} ${kbClasses}`}
       aria-current={isActive ? "true" : undefined}
     >
       {item.label}

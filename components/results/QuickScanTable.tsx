@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { ArrowUpDown, Filter, X, ExternalLink, Star } from "lucide-react";
 import {
   Table,
@@ -22,6 +22,7 @@ import { RepoRowSkeleton } from "@/components/shared/LoadingSkeleton";
 import { VerificationBadge } from "./VerificationBadge";
 import { QualityTierBadge } from "./QualityTierBadge";
 import { useScoutStore } from "@/stores/scout-store";
+import { useHotkeys } from "@/hooks/useHotkeys";
 import { getOverallVerificationStatus, formatStarCount, formatRelativeDate } from "@/lib/verification";
 import type { QualityTier, RepoResult } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -33,12 +34,17 @@ export function QuickScanTable() {
   const repos = useScoutStore((s) => s.repos);
   const isSearching = useScoutStore((s) => s.isSearching);
   const phase1Complete = useScoutStore((s) => s.phase1Complete);
+  const searchMeta = useScoutStore((s) => s.searchMeta);
 
   const [sortKey, setSortKey] = useState<SortKey>("stars");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [languageFilter, setLanguageFilter] = useState<string | null>(null);
   const [tierFilter, setTierFilter] = useState<QualityTier | null>(null);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
+
+  // Keyboard navigation state
+  const [kbSelectedIndex, setKbSelectedIndex] = useState<number>(-1);
+  const tableRef = useRef<HTMLDivElement>(null);
 
   const languages = useMemo(() => {
     const langs = new Set<string>();
@@ -146,6 +152,59 @@ export function QuickScanTable() {
     setVerifiedOnly(false);
   }, []);
 
+  // Reset keyboard selection when filter/sort changes
+  useEffect(() => {
+    setKbSelectedIndex(-1);
+  }, [languageFilter, tierFilter, verifiedOnly, sortKey, sortDir]);
+
+  // Scroll selected row into view
+  useEffect(() => {
+    if (kbSelectedIndex < 0) return;
+    const row = tableRef.current?.querySelector(
+      `[data-kb-index="${kbSelectedIndex}"]`
+    );
+    if (row) {
+      row.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [kbSelectedIndex]);
+
+  // Keyboard shortcuts for results page: j/k/Enter/e
+  useHotkeys(
+    {
+      j: () => {
+        setKbSelectedIndex((prev) => {
+          const max = filteredAndSorted.length - 1;
+          if (max < 0) return -1;
+          return prev < max ? prev + 1 : max;
+        });
+      },
+      k: () => {
+        setKbSelectedIndex((prev) => {
+          if (prev <= 0) return 0;
+          return prev - 1;
+        });
+      },
+      Enter: () => {
+        if (kbSelectedIndex >= 0 && kbSelectedIndex < filteredAndSorted.length) {
+          const repo = filteredAndSorted[kbSelectedIndex];
+          // Toggle selection (same as clicking the checkbox)
+          const toggleRepoSelection = useScoutStore.getState().toggleRepoSelection;
+          toggleRepoSelection(repo.repo_url);
+        }
+      },
+      e: () => {
+        // Trigger the export dropdown button click
+        const exportBtn = document.querySelector<HTMLButtonElement>(
+          '[data-export-trigger="true"]'
+        );
+        if (exportBtn) {
+          exportBtn.click();
+        }
+      },
+    },
+    [kbSelectedIndex, filteredAndSorted]
+  );
+
   return (
     <div className="space-y-3">
       {/* Filter bar */}
@@ -239,7 +298,7 @@ export function QuickScanTable() {
       </div>
 
       {/* Desktop table — hidden on mobile */}
-      <div className="hidden md:block rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden">
+      <div ref={tableRef} className="hidden md:block rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden">
         <Table>
           <TableHeader className="bg-muted/30">
             <TableRow className="hover:bg-transparent">
@@ -262,7 +321,7 @@ export function QuickScanTable() {
           </TableHeader>
           <TableBody>
             {filteredAndSorted.map((repo, idx) => (
-              <RepoRow key={repo.repo_url} repo={repo} index={idx} />
+              <RepoRow key={repo.repo_url} repo={repo} index={idx} isKeyboardSelected={idx === kbSelectedIndex} />
             ))}
 
             {/* Skeleton rows during loading */}
