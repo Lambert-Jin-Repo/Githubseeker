@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useScoutStore } from "@/stores/scout-store";
 import type { DeepDiveResult, ScoutSummary } from "@/lib/types";
 import { parseSSEEvents } from "@/lib/sse-parser";
@@ -174,6 +175,7 @@ export function useDeepDiveStream(
                     };
                     if (!errData.recoverable) {
                       setError(errData.message);
+                      toast.error("Analysis failed. Please try again.");
                     }
                     break;
                   }
@@ -193,6 +195,7 @@ export function useDeepDiveStream(
           const message =
             err instanceof Error ? err.message : "Deep dive failed";
           setError(message);
+          toast.error("Analysis failed. Please try again.");
           store.setIsDeepDiving(false);
         } finally {
           setIsStreaming(false);

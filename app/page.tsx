@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { Header } from "@/components/shared/Header";
 import { Footer } from "@/components/shared/Footer";
@@ -57,6 +58,7 @@ export default function HomePage() {
         });
         if (res.status === 429) {
           setRateLimited(true);
+          toast.info("You've reached the search limit. Sign in to continue.");
           return;
         }
         const data = await res.json();
@@ -72,7 +74,7 @@ export default function HomePage() {
           }
         }
       } catch {
-        // Error handled silently
+        toast.error("Search failed. Check your connection and try again.");
       } finally {
         setIsLoading(false);
       }

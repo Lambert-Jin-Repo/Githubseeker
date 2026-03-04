@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { toast } from "sonner";
 import { BookOpen, Hammer, Compass, Search, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ErrorBoundaryCard } from "@/components/shared/ErrorBoundaryCard";
@@ -66,6 +67,7 @@ export function HistoryList() {
       setItems(data.items ?? []);
     } catch {
       setError(true);
+      toast.error("Couldn't load search history. Please try again.");
     } finally {
       setIsLoading(false);
     }

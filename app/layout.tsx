@@ -27,7 +27,7 @@ export default function RootLayout({
           <div className="relative flex min-h-screen flex-col z-10">
             {children}
           </div>
-          <Toaster position="bottom-right" richColors />
+          <Toaster position="bottom-right" richColors closeButton />
         </ThemeProvider>
       </body>
     </html>

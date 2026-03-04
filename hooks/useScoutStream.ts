@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { toast } from "sonner";
 import { useScoutStore } from "@/stores/scout-store";
 import { getOrCreateSessionId } from "@/lib/session";
 
@@ -143,12 +144,14 @@ export function useScoutStream(searchId: string | null) {
             const data = JSON.parse((e as MessageEvent).data);
             if (data.recoverable) {
               setError((data.message || "Something went wrong") + " — partial results shown below");
+              toast.warning("Search partially completed. Showing available results.");
               useScoutStore.getState().setPhase1Complete(true);
               useScoutStore.getState().setIsSearching(false);
               setIsComplete(true);
               es.close();
             } else {
               setError(data.message || "Search failed");
+              toast.error("Search failed. Please try again.");
             }
           } catch {
             // Not a JSON payload — might be a native EventSource error, handled by es.onerror
@@ -170,6 +173,7 @@ export function useScoutStream(searchId: string | null) {
           } else {
             es.close();
             setError("Connection lost. Please refresh the page.");
+            toast.error("Connection lost. Check your internet and refresh the page.");
             setIsConnected(false);
           }
         };
@@ -202,6 +206,7 @@ export function useScoutStream(searchId: string | null) {
       }
     } catch {
       setError("Failed to retry search. Please try again.");
+      toast.error("Failed to retry search. Please try again.");
     }
   }, []);
 
