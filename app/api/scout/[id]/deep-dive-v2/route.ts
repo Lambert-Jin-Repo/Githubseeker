@@ -59,6 +59,14 @@ export async function POST(
     ? body.precomputed_results
     : [];
 
+  // Cap repo_urls to prevent abuse
+  if (repo_urls.length > 10) {
+    return NextResponse.json(
+      { error: "Maximum 10 repo_urls allowed" },
+      { status: 400 }
+    );
+  }
+
   // Must have something to work with
   if (repo_urls.length === 0 && precomputed.length === 0) {
     return NextResponse.json(

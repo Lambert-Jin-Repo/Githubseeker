@@ -7,7 +7,7 @@ import { createServerClient, getSessionUserIdFromAuth } from "@/lib/supabase";
 import { createAuthServerClient } from "@/lib/supabase/server";
 import { checkAnonymousRateLimit } from "@/lib/rate-limit";
 import { getClientIp } from "@/lib/auth";
-import { analyzeRepoV2 } from "@/lib/deep-dive-analyzer-v2";
+import { analyzeReposV2Batch } from "@/lib/deep-dive-analyzer-v2";
 import type {
   ScoutMode,
   ScoutRequest,
@@ -274,9 +274,26 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Missing search ID" }, { status: 400 });
   }
 
+  // Verify the search belongs to the requesting user
+  const authClient = await createAuthServerClient();
+  const { userId } = await getSessionUserIdFromAuth(request, authClient);
+
   const searchParams = pendingSearches.get(searchId);
   if (!searchParams) {
     return NextResponse.json({ error: "Search not found or expired" }, { status: 404 });
+  }
+
+  // Verify ownership: check that the persisted search row belongs to this user
+  const db = createServerClient();
+  const { data: searchRow } = await db
+    .from("searches")
+    .select("id")
+    .eq("id", searchId)
+    .eq("user_id", userId)
+    .single();
+
+  if (!searchRow) {
+    return NextResponse.json({ error: "Search not found" }, { status: 404 });
   }
 
   const { query, mode } = searchParams;
@@ -525,12 +542,13 @@ export async function GET(request: NextRequest) {
             console.error("[scout/GET] Failed to persist results:", err);
           }
 
-          // Fire-and-forget: pre-compute deep dives for all repos
-          if (dedupedRepos.length > 0) {
-            const urls = dedupedRepos.map((r) => r.repo_url);
-            Promise.allSettled(
-              urls.map((url) => analyzeRepoV2(url, searchId))
-            ).catch((err) =>
+          // Fire-and-forget: pre-compute deep dives for Tier 1 repos only (top 5)
+          const tier1Repos = dedupedRepos
+            .filter((r) => r.quality_tier === 1)
+            .slice(0, 5);
+          if (tier1Repos.length > 0) {
+            const urls = tier1Repos.map((r) => r.repo_url);
+            analyzeReposV2Batch(urls, searchId).catch((err) =>
               console.error("[scout/GET] Background precompute failed:", err)
             );
           }

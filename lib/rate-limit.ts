@@ -1,7 +1,7 @@
 import { createServerClient } from "@/lib/supabase";
 
 const ANONYMOUS_LIMIT = 2;
-const WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
+const WINDOW_HOURS = 24;
 
 export interface RateLimitResult {
   allowed: boolean;
@@ -13,55 +13,18 @@ export async function checkAnonymousRateLimit(
 ): Promise<RateLimitResult> {
   const db = createServerClient();
 
-  const { data, error } = await db
-    .from("rate_limits")
-    .select("search_count, window_start")
-    .eq("ip_address", ip)
-    .single();
+  const { data, error } = await db.rpc("check_and_increment_rate_limit", {
+    p_ip: ip,
+    p_limit: ANONYMOUS_LIMIT,
+    p_window_hours: WINDOW_HOURS,
+  });
 
-  if (error || !data) {
-    // No record — first search from this IP
-    await db.from("rate_limits").upsert(
-      {
-        ip_address: ip,
-        search_count: 1,
-        window_start: new Date().toISOString(),
-      },
-      { onConflict: "ip_address" }
-    );
-    return { allowed: true, remaining: ANONYMOUS_LIMIT - 1 };
+  if (error || !data || data.length === 0) {
+    // On RPC failure, allow the request (fail-open) but log
+    console.error("[rate-limit] RPC error:", error?.message);
+    return { allowed: true, remaining: 0 };
   }
 
-  const windowStart = new Date(data.window_start).getTime();
-  const now = Date.now();
-
-  if (now - windowStart > WINDOW_MS) {
-    await db.from("rate_limits").upsert(
-      {
-        ip_address: ip,
-        search_count: 1,
-        window_start: new Date().toISOString(),
-      },
-      { onConflict: "ip_address" }
-    );
-    return { allowed: true, remaining: ANONYMOUS_LIMIT - 1 };
-  }
-
-  if (data.search_count >= ANONYMOUS_LIMIT) {
-    return { allowed: false, remaining: 0 };
-  }
-
-  await db.from("rate_limits").upsert(
-    {
-      ip_address: ip,
-      search_count: data.search_count + 1,
-      window_start: data.window_start,
-    },
-    { onConflict: "ip_address" }
-  );
-
-  return {
-    allowed: true,
-    remaining: ANONYMOUS_LIMIT - (data.search_count + 1),
-  };
+  const row = data[0] as { allowed: boolean; remaining: number };
+  return { allowed: row.allowed, remaining: row.remaining };
 }

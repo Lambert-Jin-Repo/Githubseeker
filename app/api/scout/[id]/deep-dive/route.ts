@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient, getSessionUserId } from "@/lib/supabase";
+import { createServerClient, getSessionUserIdFromAuth } from "@/lib/supabase";
+import { createAuthServerClient } from "@/lib/supabase/server";
 import {
   analyzeRepo,
   buildSummaryPrompt,
@@ -25,7 +26,8 @@ export async function POST(
   }
 
   // Verify the search belongs to the requesting user
-  const userId = getSessionUserId(request);
+  const authClient = await createAuthServerClient();
+  const { userId } = await getSessionUserIdFromAuth(request, authClient);
   const db = createServerClient();
   const { data: search } = await db
     .from("searches")
@@ -54,6 +56,14 @@ export async function POST(
   const precomputed: DeepDiveResult[] = Array.isArray(body.precomputed_results)
     ? body.precomputed_results
     : [];
+
+  // Cap repo_urls to prevent abuse
+  if (repo_urls.length > 10) {
+    return NextResponse.json(
+      { error: "Maximum 10 repo_urls allowed" },
+      { status: 400 }
+    );
+  }
 
   // Must have something to work with
   if (repo_urls.length === 0 && precomputed.length === 0) {
