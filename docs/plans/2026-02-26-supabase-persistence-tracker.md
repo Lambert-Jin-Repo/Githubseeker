@@ -95,4 +95,6 @@
 
 ## Tests
 
-84/84 passing (12 test files), TypeScript compiles clean
+206/206 passing (18 test files), TypeScript compiles clean
+
+*Updated 2026-03-04 after Phase 10 Code Quality Hardening (95 new tests across 6 new/modified test files)*

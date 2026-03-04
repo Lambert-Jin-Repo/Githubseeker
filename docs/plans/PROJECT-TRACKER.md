@@ -196,19 +196,19 @@
 
 ---
 
-## Phase 3: Polish & Robustness (NOT STARTED)
+## Phase 3: Polish & Robustness (COMPLETE — done across earlier phases)
 
-| # | Task | Priority | Status | Description |
+| # | Task | Priority | Status | Done In |
 |---|---|---|---|---|
-| 1 | Error recovery for MiniMax API failures | P1 | `pending` | Show partial results + retry button if LLM fails mid-stream |
-| 2 | Error recovery for Serper API failures | P1 | `pending` | Show helpful error state if search API fails |
-| 3 | Search result caching | P1 | `pending` | Check if same query was searched recently; add "Refresh" button |
-| 4 | Loading state improvements | P1 | `done` | Skeleton loading + error states added in Phase 9 |
-| 5 | Singleton Supabase client | P2 | `pending` | `createServerClient()` creates new instance per call; use lazy singleton |
-| 6 | Feedback deduplication | P2 | `pending` | Prevent duplicate feedback rows; use upsert or client-side guard |
-| 7 | History endpoint optimization | P2 | `pending` | Replace full-row fetch with aggregate count query |
-| 8 | Secure cookie flag | P2 | `pending` | Add `Secure` flag to session cookie for HTTPS production |
-| 9 | Deep dive update verification | P2 | `pending` | Check affected row count after `update()` to catch URL mismatches |
+| 1 | Error recovery for MiniMax API failures | P1 | `done` | Phase 3 (commit `2e7a90e`) |
+| 2 | Error recovery for Serper API failures | P1 | `done` | Phase 3 (commit `2e7a90e`) |
+| 3 | Search result caching | P1 | `done` | Phase 3 (commit `2e7a90e`) |
+| 4 | Loading state improvements | P1 | `done` | Phase 9 |
+| 5 | Singleton Supabase client | P2 | `done` | Phase 3 (commit `2e7a90e`) |
+| 6 | Feedback deduplication | P2 | `done` | Phase 3 (commit `2e7a90e`) + Phase 10 A2 |
+| 7 | History endpoint optimization | P2 | `done` | Phase 3 (commit `2e7a90e`) |
+| 8 | Secure cookie flag | P2 | `done` | Phase 3 (commit `2e7a90e`) |
+| 9 | Deep dive update verification | P2 | `done` | Phase 3 (commit `2e7a90e`) |
 
 ---
 
@@ -218,12 +218,21 @@
 |---|---|
 | Framework | Next.js 16.1.6 (App Router), TypeScript |
 | Styling | Tailwind CSS v4, shadcn/ui (new-york) |
-| AI | MiniMax M2.5 via OpenAI SDK (`api.minimax.io/v1`) |
+| AI | MiniMax M2.5 via OpenAI SDK (`api.minimaxi.com/v1`) |
 | Search | Serper API (Google Search) at `google.serper.dev/search` |
 | Database | Supabase (project: `fnylozxqgmnzvdbshzvn`, region: ap-southeast-1, free plan) |
 | State | Zustand |
 | Testing | Vitest (206 tests, 18 files) |
 | Fonts | Literata (headings), Atkinson Hyperlegible Next (body), JetBrains Mono (code) |
+
+### Phase 10 Commits
+| Group | Commit | Description |
+|---|---|---|
+| A | `621a996` | Security & auth hardening |
+| B | `8ad8113` | API reliability hardening |
+| C | `df29d2f` | Client-side fixes |
+| D | `31553d7` | Modular design refactors |
+| E | `4132a39` | Test coverage (206 tests, 18 files) |
 
 ## Key Files
 
@@ -233,14 +242,21 @@
 | `lib/llm.ts` | Agentic tool loop (MiniMax + web_search/web_fetch) |
 | `lib/web-search.ts` | Serper API client + fetchWebPage |
 | `lib/session.ts` | Session cookie creation + UUID validation |
+| `lib/env.ts` | `requireEnv()` — env var validation (Phase 10 B5) |
+| `lib/sse.ts` | `sseEncode`, `SSE_HEADERS`, `createSSEStream` (Phase 10 D1) |
+| `lib/text-utils.ts` | `extractJSON` shared utility (Phase 10 D2) |
+| `lib/persistence.ts` | `persistDeepDive` shared utility (Phase 10 D4) |
+| `lib/sse-parser.ts` | `parseSSEEvents` shared utility (Phase 10 D5) |
 | `app/api/scout/route.ts` | Phase 1 POST (create search) + GET (SSE stream) |
-| `app/api/scout/[id]/deep-dive/route.ts` | Phase 2 deep dive SSE stream |
+| `app/api/scout/[id]/deep-dive/route.ts` | Phase 2 deep dive SSE stream (V1) |
+| `app/api/scout/[id]/deep-dive-v2/route.ts` | Phase 2 deep dive SSE stream (V2) |
 | `app/api/scout/[id]/results/route.ts` | Load saved search results |
 | `app/api/feedback/route.ts` | Persist feedback |
 | `app/api/history/route.ts` | Query search history |
 | `hooks/useScoutStream.ts` | Phase 1 SSE consumer (checks DB first) |
 | `hooks/useGlobalSearchStream.ts` | Global SSE listener (layout-level, Zustand subscribe) |
-| `hooks/useDeepDiveStream.ts` | Phase 2 SSE consumer |
+| `hooks/useDeepDiveStream.ts` | Phase 2 SSE consumer (V1) |
+| `hooks/useDeepDiveStreamV2.ts` | Phase 2 SSE consumer (V2) |
 | `stores/scout-store.ts` | Full Zustand store |
 | `stores/search-notification-store.ts` | Global search notification state |
 | `components/shared/GlobalSearchStatus.tsx` | Header status pill |
