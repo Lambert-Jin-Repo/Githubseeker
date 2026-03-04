@@ -17,8 +17,8 @@ export function ExecutiveSummary({ summary, mode }: ExecutiveSummaryProps) {
   const modeLabel = mode === "LEARN" ? "Learning" : mode === "BUILD" ? "Building" : "Scouting";
 
   return (
-    <div className="rounded-lg border border-border/50 bg-card p-6 space-y-8">
-      <h2 className="font-serif text-2xl text-foreground">Executive Summary</h2>
+    <div className="rounded-lg border border-border/50 bg-card px-4 py-5 sm:p-6 space-y-6 sm:space-y-8">
+      <h2 className="font-serif text-xl sm:text-2xl text-foreground">Executive Summary</h2>
 
       {/* Key Takeaways */}
       {summary.takeaways.length > 0 && (
