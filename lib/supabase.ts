@@ -1,6 +1,6 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import type { NextRequest } from "next/server";
-import { isValidSessionId } from "./session";
+import { isValidSessionId, SESSION_COOKIE_NAME } from "./session";
 import { requireEnv } from "./env";
 
 const supabaseUrl = requireEnv("NEXT_PUBLIC_SUPABASE_URL");
@@ -19,8 +19,6 @@ export function createServerClient() {
   _serverClient = createClient(supabaseUrl, secretKey);
   return _serverClient;
 }
-
-const SESSION_COOKIE_NAME = "github_scout_session";
 
 // Extract user ID from session cookie on a server request
 export function getSessionUserId(request: NextRequest): string {

@@ -1,8 +1,8 @@
 import { callLLMWithTools } from "@/lib/llm";
-import { fetchRepoData } from "@/lib/repo-data-fetcher";
+import { fetchRepoData, fetchAllReposData } from "@/lib/repo-data-fetcher";
 import type { RawRepoData } from "@/lib/repo-data-fetcher";
-import { createServerClient } from "@/lib/supabase";
-import { extractJSON } from "@/lib/deep-dive-analyzer";
+import { persistDeepDive } from "@/lib/persistence";
+import { extractJSON } from "@/lib/text-utils";
 import { webSearch, fetchWebPage } from "@/lib/web-search";
 import type {
   DeepDiveResultV2,
@@ -35,11 +35,7 @@ function buildDataContext(data: RawRepoData): string {
   }
 
   if (data.treeContent) {
-    sections.push(`\n## Repository Tree HTML (truncated to 4000 chars)\n${data.treeContent.slice(0, 4000)}`);
-  }
-
-  if (data.repoPageHtml) {
-    sections.push(`\n## Repo Page HTML (truncated to 6000 chars)\n${data.repoPageHtml.slice(0, 6000)}`);
+    sections.push(`\n## Repository Tree HTML (truncated to 2000 chars)\n${data.treeContent.slice(0, 2000)}`);
   }
 
   if (data.ciConfigContent) {
@@ -517,109 +513,160 @@ async function batchSearchAgentEcosystem(
   }
 }
 
-// ── Core analysis function ───────────────────────────────────────
+// ── Per-repo analysis helper (shared by single + batch paths) ────
+
+function buildEcosystemContext(
+  ecosystemData: AgentEcosystemRaw | undefined,
+): string | undefined {
+  if (!ecosystemData || ecosystemData.fileUrls.length === 0) return undefined;
+  const contextParts: string[] = [];
+  for (const file of ecosystemData.fileUrls) {
+    const content = ecosystemData.fileContents.get(file.path);
+    contextParts.push(
+      `File: ${file.path} (${file.type})\nURL: ${file.url}${content ? `\nContent:\n${content}` : ""}`,
+    );
+  }
+  return contextParts.join("\n---\n");
+}
+
+async function analyzeRepoWithData(
+  data: RawRepoData,
+  repoUrl: string,
+  ecosystemContext: string | undefined,
+  searchId: string,
+): Promise<DeepDiveResultV2> {
+  // Fire 4 parallel LLM calls
+  const promptA = buildGroupAPrompt(data);
+  const promptB = buildGroupBPrompt(data);
+  const promptC = buildGroupCPrompt(data, ecosystemContext);
+  const promptD = buildGroupDPrompt(data);
+
+  const [responseA, responseB, responseC, responseD] = await Promise.all([
+    callLLMWithTools({ ...promptA, maxToolRounds: 0 }),
+    callLLMWithTools({ ...promptB, maxToolRounds: 0 }),
+    callLLMWithTools({ ...promptC, maxToolRounds: 0 }),
+    callLLMWithTools({ ...promptD, maxToolRounds: 0 }),
+  ]);
+
+  // Parse and merge results
+  const parsedA = safeParseJSON(responseA);
+  const parsedB = safeParseJSON(responseB);
+  const parsedC = safeParseJSON(responseC);
+  const parsedD = safeParseJSON(responseD);
+
+  const techStack = parsedA.tech_stack as Record<string, unknown> | undefined;
+  const skillsReq = parsedC.skills_required as Record<string, unknown> | undefined;
+
+  const result: DeepDiveResultV2 = {
+    repo_url: repoUrl,
+    repo_name: `${data.owner}/${data.repo}`,
+    stars: typeof parsedA.stars === "number" ? parsedA.stars : 0,
+    contributors: typeof parsedA.contributors === "number" ? parsedA.contributors : null,
+    license: typeof parsedA.license === "string" ? parsedA.license : "Unknown",
+    primary_language: typeof parsedA.primary_language === "string" ? parsedA.primary_language : "Unknown",
+    last_updated: typeof parsedA.last_updated === "string" ? parsedA.last_updated : new Date().toISOString().split("T")[0],
+    overview: parseEnhancedSection(parsedA.overview, "Overview"),
+    why_it_stands_out: parseEnhancedSection(parsedA.why_it_stands_out, "Why It Stands Out"),
+    tech_stack: {
+      languages: techStack ? parseStringArray(techStack.languages) : [],
+      frameworks: techStack && Array.isArray(techStack.frameworks) ? techStack.frameworks.map((f: unknown) => {
+        if (typeof f === "string") return { name: f };
+        if (f && typeof f === "object") {
+          const o = f as Record<string, unknown>;
+          return { name: String(o.name || ""), version: typeof o.version === "string" ? o.version : undefined, url: typeof o.url === "string" ? o.url : undefined };
+        }
+        return { name: "" };
+      }).filter((f) => f.name) : [],
+      infrastructure: techStack ? parseStringArray(techStack.infrastructure) : [],
+      key_dependencies: techStack && Array.isArray(techStack.key_dependencies) ? techStack.key_dependencies.map((d: unknown) => {
+        if (typeof d === "string") return { name: d };
+        if (d && typeof d === "object") {
+          const o = d as Record<string, unknown>;
+          return { name: String(o.name || ""), version: typeof o.version === "string" ? o.version : undefined, url: typeof o.url === "string" ? o.url : undefined };
+        }
+        return { name: "" };
+      }).filter((d) => d.name) : [],
+      confidence: techStack ? parseConfidence(techStack.confidence) : "low",
+      sources: techStack ? parseSources(techStack.sources) : [],
+    },
+    architecture: parseEnhancedSection(parsedA.architecture, "Architecture"),
+    code_quality: parseCodeQuality(parsedB.code_quality),
+    community_health: parseCommunityHealth(parsedB.community_health),
+    documentation_quality: parseDocumentationQuality(parsedB.documentation_quality),
+    security_posture: parseSecurityPosture(parsedB.security_posture),
+    ai_patterns: parseAIPatternsV2(parsedC.ai_patterns),
+    skills_required: {
+      technical: skillsReq ? parseStringArray(skillsReq.technical) : [],
+      design: skillsReq ? parseStringArray(skillsReq.design) : [],
+      domain: skillsReq ? parseStringArray(skillsReq.domain) : [],
+    },
+    agent_ecosystem: parseAgentEcosystem(parsedC.agent_ecosystem),
+    getting_started: parseGettingStarted(parsedD.getting_started),
+    mode_specific: parseEnhancedSection(parsedC.mode_specific, "Key Insights"),
+  };
+
+  // Persist to Supabase
+  await persistDeepDive(searchId, repoUrl, result);
+
+  return result;
+}
+
+// ── Core analysis function (single repo) ─────────────────────────
 
 export async function analyzeRepoV2(
   repoUrl: string,
   searchId: string,
 ): Promise<DeepDiveResultV2> {
   try {
-    // Phase 1: Fetch all raw data
     const data = await fetchRepoData(repoUrl);
 
-    // Phase 1.5: Batch search for agent ecosystem files
     const repoInfo = { owner: data.owner, repo: data.repo, repoUrl };
     const ecosystemMap = await batchSearchAgentEcosystem([repoInfo]);
-    const ecosystemData = ecosystemMap.get(repoUrl);
-    let ecosystemContext: string | undefined;
-    if (ecosystemData && ecosystemData.fileUrls.length > 0) {
-      const contextParts: string[] = [];
-      for (const file of ecosystemData.fileUrls) {
-        const content = ecosystemData.fileContents.get(file.path);
-        contextParts.push(`File: ${file.path} (${file.type})\nURL: ${file.url}${content ? `\nContent:\n${content}` : ""}`);
-      }
-      ecosystemContext = contextParts.join("\n---\n");
-    }
+    const ecosystemContext = buildEcosystemContext(ecosystemMap.get(repoUrl));
 
-    // Phase 2: Fire 4 parallel LLM calls
-    const promptA = buildGroupAPrompt(data);
-    const promptB = buildGroupBPrompt(data);
-    const promptC = buildGroupCPrompt(data, ecosystemContext);
-    const promptD = buildGroupDPrompt(data);
-
-    const [responseA, responseB, responseC, responseD] = await Promise.all([
-      callLLMWithTools({ ...promptA, maxToolRounds: 0 }),
-      callLLMWithTools({ ...promptB, maxToolRounds: 0 }),
-      callLLMWithTools({ ...promptC, maxToolRounds: 0 }),
-      callLLMWithTools({ ...promptD, maxToolRounds: 0 }),
-    ]);
-
-    // Phase 3: Parse and merge results
-    const parsedA = safeParseJSON(responseA);
-    const parsedB = safeParseJSON(responseB);
-    const parsedC = safeParseJSON(responseC);
-    const parsedD = safeParseJSON(responseD);
-
-    const techStack = parsedA.tech_stack as Record<string, unknown> | undefined;
-    const skillsReq = parsedC.skills_required as Record<string, unknown> | undefined;
-
-    const result: DeepDiveResultV2 = {
-      repo_url: repoUrl,
-      repo_name: `${data.owner}/${data.repo}`,
-      stars: typeof parsedA.stars === "number" ? parsedA.stars : 0,
-      contributors: typeof parsedA.contributors === "number" ? parsedA.contributors : null,
-      license: typeof parsedA.license === "string" ? parsedA.license : "Unknown",
-      primary_language: typeof parsedA.primary_language === "string" ? parsedA.primary_language : "Unknown",
-      last_updated: typeof parsedA.last_updated === "string" ? parsedA.last_updated : new Date().toISOString().split("T")[0],
-      overview: parseEnhancedSection(parsedA.overview, "Overview"),
-      why_it_stands_out: parseEnhancedSection(parsedA.why_it_stands_out, "Why It Stands Out"),
-      tech_stack: {
-        languages: techStack ? parseStringArray(techStack.languages) : [],
-        frameworks: techStack && Array.isArray(techStack.frameworks) ? techStack.frameworks.map((f: unknown) => {
-          if (typeof f === "string") return { name: f };
-          if (f && typeof f === "object") {
-            const o = f as Record<string, unknown>;
-            return { name: String(o.name || ""), version: typeof o.version === "string" ? o.version : undefined, url: typeof o.url === "string" ? o.url : undefined };
-          }
-          return { name: "" };
-        }).filter((f) => f.name) : [],
-        infrastructure: techStack ? parseStringArray(techStack.infrastructure) : [],
-        key_dependencies: techStack && Array.isArray(techStack.key_dependencies) ? techStack.key_dependencies.map((d: unknown) => {
-          if (typeof d === "string") return { name: d };
-          if (d && typeof d === "object") {
-            const o = d as Record<string, unknown>;
-            return { name: String(o.name || ""), version: typeof o.version === "string" ? o.version : undefined, url: typeof o.url === "string" ? o.url : undefined };
-          }
-          return { name: "" };
-        }).filter((d) => d.name) : [],
-        confidence: techStack ? parseConfidence(techStack.confidence) : "low",
-        sources: techStack ? parseSources(techStack.sources) : [],
-      },
-      architecture: parseEnhancedSection(parsedA.architecture, "Architecture"),
-      code_quality: parseCodeQuality(parsedB.code_quality),
-      community_health: parseCommunityHealth(parsedB.community_health),
-      documentation_quality: parseDocumentationQuality(parsedB.documentation_quality),
-      security_posture: parseSecurityPosture(parsedB.security_posture),
-      ai_patterns: parseAIPatternsV2(parsedC.ai_patterns),
-      skills_required: {
-        technical: skillsReq ? parseStringArray(skillsReq.technical) : [],
-        design: skillsReq ? parseStringArray(skillsReq.design) : [],
-        domain: skillsReq ? parseStringArray(skillsReq.domain) : [],
-      },
-      agent_ecosystem: parseAgentEcosystem(parsedC.agent_ecosystem),
-      getting_started: parseGettingStarted(parsedD.getting_started),
-      mode_specific: parseEnhancedSection(parsedC.mode_specific, "Key Insights"),
-    };
-
-    // Persist to Supabase
-    await persistDeepDiveV2(searchId, repoUrl, result);
-
-    return result;
+    return await analyzeRepoWithData(data, repoUrl, ecosystemContext, searchId);
   } catch (err) {
     console.error(`[deep-dive-analyzer-v2] Failed to analyze ${repoUrl}:`, err instanceof Error ? err.message : err);
     const fallback = buildFallbackResultV2(repoUrl);
-    await persistDeepDiveV2(searchId, repoUrl, fallback);
+    await persistDeepDive(searchId, repoUrl, fallback);
     return fallback;
+  }
+}
+
+// ── Batch analysis function (shared ecosystem search) ────────────
+
+export async function analyzeReposV2Batch(
+  repoUrls: string[],
+  searchId: string,
+): Promise<DeepDiveResultV2[]> {
+  if (repoUrls.length === 0) return [];
+
+  try {
+    // Fetch all repo data in parallel
+    const allData = await fetchAllReposData(repoUrls);
+
+    // Single batch ecosystem search for all repos
+    const repoInfos = allData.map((d) => ({
+      owner: d.owner,
+      repo: d.repo,
+      repoUrl: d.repoUrl,
+    }));
+    const ecosystemMap = await batchSearchAgentEcosystem(repoInfos);
+
+    // Analyze each repo in parallel using shared ecosystem data
+    const results = await Promise.allSettled(
+      allData.map((data) => {
+        const ecosystemContext = buildEcosystemContext(ecosystemMap.get(data.repoUrl));
+        return analyzeRepoWithData(data, data.repoUrl, ecosystemContext, searchId);
+      }),
+    );
+
+    return results.map((r, i) =>
+      r.status === "fulfilled" ? r.value : buildFallbackResultV2(repoUrls[i]),
+    );
+  } catch (err) {
+    console.error("[deep-dive-analyzer-v2] Batch analysis failed:", err instanceof Error ? err.message : err);
+    return repoUrls.map((url) => buildFallbackResultV2(url));
   }
 }
 
@@ -672,30 +719,6 @@ function safeParseJSON(text: string): Record<string, unknown> {
     return JSON.parse(cleaned) as Record<string, unknown>;
   } catch {
     return {};
-  }
-}
-
-async function persistDeepDiveV2(
-  searchId: string,
-  repoUrl: string,
-  result: DeepDiveResultV2
-): Promise<void> {
-  try {
-    const db = createServerClient();
-    const { data: updated, error } = await db
-      .from("search_results")
-      .update({ deep_dive: result })
-      .eq("search_id", searchId)
-      .eq("repo_url", repoUrl)
-      .select("id");
-
-    if (error) {
-      console.error("[deep-dive-analyzer-v2] Persist error:", error);
-    } else if (!updated || updated.length === 0) {
-      console.warn(`[deep-dive-analyzer-v2] Update matched 0 rows for search_id=${searchId}, repo_url=${repoUrl}`);
-    }
-  } catch (e) {
-    console.error("[deep-dive-analyzer-v2] Persist exception:", e);
   }
 }
 

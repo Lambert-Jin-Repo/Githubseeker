@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
 
-const SESSION_COOKIE_NAME = "github_scout_session";
+export const SESSION_COOKIE_NAME = "github_scout_session";
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

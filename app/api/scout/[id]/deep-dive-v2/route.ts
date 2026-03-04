@@ -8,12 +8,10 @@ import {
   buildFallbackResultV2,
 } from "@/lib/deep-dive-analyzer-v2";
 import { callLLMWithTools } from "@/lib/llm";
-import { extractJSON } from "@/lib/deep-dive-analyzer";
+import { extractJSON } from "@/lib/text-utils";
 import type { DeepDiveResultV2, ScoutSummaryV2 } from "@/lib/types";
 
-function sseEncode(event: string, data: unknown): string {
-  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-}
+import { sseEncode, SSE_HEADERS } from "@/lib/sse";
 
 export async function POST(
   request: NextRequest,
@@ -225,12 +223,5 @@ export async function POST(
     },
   });
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
-      "X-Accel-Buffering": "no",
-    },
-  });
+  return new Response(stream, { headers: SSE_HEADERS });
 }

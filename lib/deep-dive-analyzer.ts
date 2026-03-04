@@ -1,5 +1,6 @@
 import { callLLMWithTools } from "@/lib/llm";
-import { createServerClient } from "@/lib/supabase";
+import { persistDeepDive } from "@/lib/persistence";
+import { extractJSON } from "@/lib/text-utils";
 import type {
   DeepDiveResult,
   DeepDiveSection,
@@ -372,20 +373,6 @@ export function parseSummary(raw: Record<string, unknown>): ScoutSummary {
   };
 }
 
-export function extractJSON(text: string): string {
-  // Try to extract JSON from markdown code fences
-  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fenceMatch) {
-    return fenceMatch[1].trim();
-  }
-  // Try to extract raw JSON object
-  const braceMatch = text.match(/\{[\s\S]*\}/);
-  if (braceMatch) {
-    return braceMatch[0];
-  }
-  return text;
-}
-
 // ── Fallback builder ─────────────────────────────────────────────
 
 export function buildFallbackResult(repoUrl: string): DeepDiveResult {
@@ -451,7 +438,7 @@ Fetch the repo page, read the README, check dependencies, and identify AI patter
     const result = parseDeepDiveResult(parsed, repoUrl);
 
     // Persist to Supabase
-    await persistDeepDive(searchId, repoUrl, result);
+    await persistDeepDive(searchId, repoUrl, result, "[deep-dive-analyzer]");
 
     return result;
   } catch (err) {
@@ -462,36 +449,8 @@ Fetch the repo page, read the README, check dependencies, and identify AI patter
     const fallback = buildFallbackResult(repoUrl);
 
     // Persist fallback
-    await persistDeepDive(searchId, repoUrl, fallback);
+    await persistDeepDive(searchId, repoUrl, fallback, "[deep-dive-analyzer]");
 
     return fallback;
-  }
-}
-
-// ── Persistence helper ───────────────────────────────────────────
-
-async function persistDeepDive(
-  searchId: string,
-  repoUrl: string,
-  result: DeepDiveResult
-): Promise<void> {
-  try {
-    const db = createServerClient();
-    const { data: updated, error } = await db
-      .from("search_results")
-      .update({ deep_dive: result })
-      .eq("search_id", searchId)
-      .eq("repo_url", repoUrl)
-      .select("id");
-
-    if (error) {
-      console.error("[deep-dive-analyzer] Persist error:", error);
-    } else if (!updated || updated.length === 0) {
-      console.warn(
-        `[deep-dive-analyzer] Update matched 0 rows for search_id=${searchId}, repo_url=${repoUrl}`
-      );
-    }
-  } catch (e) {
-    console.error("[deep-dive-analyzer] Persist exception:", e);
   }
 }

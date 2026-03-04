@@ -159,9 +159,7 @@ function parseRepoFromRaw(raw: Record<string, unknown>): RepoResult {
   };
 }
 
-function sseEncode(event: string, data: unknown): string {
-  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-}
+import { sseEncode, SSE_HEADERS } from "@/lib/sse";
 
 // POST /api/scout — Start a new search, returns { id } for SSE connection
 export async function POST(request: NextRequest) {
@@ -588,12 +586,5 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
-      "X-Accel-Buffering": "no",
-    },
-  });
+  return new Response(stream, { headers: SSE_HEADERS });
 }
