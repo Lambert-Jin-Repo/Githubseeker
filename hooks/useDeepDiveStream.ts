@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useScoutStore } from "@/stores/scout-store";
 import type { DeepDiveResult, ScoutSummary } from "@/lib/types";
 
@@ -145,7 +145,6 @@ export function useDeepDiveStream(
 
           const decoder = new TextDecoder();
           let buffer = "";
-          let completedCount = ready.length;
 
           while (true) {
             const { done, value } = await reader.read();
@@ -179,18 +178,14 @@ export function useDeepDiveStream(
 
                   case "deep_dive_complete": {
                     const result = parsed as DeepDiveResult;
-                    // Only add to store if this wasn't a pre-computed result
-                    // (pre-computed results were already re-emitted by the server,
-                    //  but we added them to the store in step 2)
                     const isPrecomputed = ready.some(
                       (r) => r.repo_url === result.repo_url
                     );
                     if (!isPrecomputed) {
                       store.addDeepDiveResult(result);
-                      completedCount += 1;
                       setProgress((prev) => ({
                         ...prev,
-                        completed: completedCount,
+                        completed: prev.completed + 1,
                       }));
                     }
                     break;
@@ -239,6 +234,13 @@ export function useDeepDiveStream(
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [searchId, isStreaming]
   );
+
+  // Abort in-flight request on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   return { startDeepDive, isStreaming, progress, error };
 }

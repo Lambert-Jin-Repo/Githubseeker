@@ -118,6 +118,7 @@ export function useGlobalSearchStream() {
                         es.close();
                         setTimeout(connect, 1000 * reconnectAttemptsRef.current);
                     } else {
+                        es.close();
                         notifStore.getState().setError("Connection lost. Please try again.");
                     }
                 };

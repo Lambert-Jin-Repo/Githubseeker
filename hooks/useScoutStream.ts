@@ -12,7 +12,6 @@ export function useScoutStream(searchId: string | null) {
   const reconnectAttemptsRef = useRef(0);
   const eventSourceRef = useRef<EventSource | null>(null);
   const queryRef = useRef<string | null>(null);
-  const store = useScoutStore();
 
   useEffect(() => {
     if (!searchId) {
@@ -31,8 +30,8 @@ export function useScoutStream(searchId: string | null) {
 
           if (data.search?.phase1_complete) {
             // Reset store before hydrating to prevent duplicates (React strict mode)
-            store.reset();
-            store.setSearchMeta({
+            useScoutStore.getState().reset();
+            useScoutStore.getState().setSearchMeta({
               id: searchId,
               query: data.search.query,
               mode: data.search.mode,
@@ -42,25 +41,25 @@ export function useScoutStream(searchId: string | null) {
               repos_verified: 0,
               created_at: data.search.created_at,
             });
-            store.setMode(data.search.mode);
+            useScoutStore.getState().setMode(data.search.mode);
             queryRef.current = data.search.query;
 
             for (const obs of data.search.observations || []) {
-              store.addObservation(obs);
+              useScoutStore.getState().addObservation(obs);
             }
 
             for (const repo of data.results || []) {
-              store.addRepo(repo);
+              useScoutStore.getState().addRepo(repo);
               if (repo.deep_dive) {
-                store.addDeepDiveResult(repo.deep_dive);
+                useScoutStore.getState().addDeepDiveResult(repo.deep_dive);
               }
             }
 
-            store.setPhase1Complete(true);
-            store.setIsSearching(false);
+            useScoutStore.getState().setPhase1Complete(true);
+            useScoutStore.getState().setIsSearching(false);
 
             if (data.search.phase2_complete) {
-              store.setPhase2Complete(true);
+              useScoutStore.getState().setPhase2Complete(true);
             }
 
             setIsComplete(true);
@@ -88,9 +87,9 @@ export function useScoutStream(searchId: string | null) {
 
         es.addEventListener("mode_detected", (e) => {
           const data = JSON.parse(e.data);
-          store.setMode(data.mode);
+          useScoutStore.getState().setMode(data.mode);
           queryRef.current = data.topic || "";
-          store.setSearchMeta({
+          useScoutStore.getState().setSearchMeta({
             id: searchId,
             query: data.topic || "",
             mode: data.mode,
@@ -104,32 +103,32 @@ export function useScoutStream(searchId: string | null) {
 
         es.addEventListener("search_progress", (e) => {
           const data = JSON.parse(e.data);
-          store.addSearchProgress(data);
+          useScoutStore.getState().addSearchProgress(data);
         });
 
         es.addEventListener("repo_discovered", (e) => {
           const data = JSON.parse(e.data);
-          store.addRepo(data);
+          useScoutStore.getState().addRepo(data);
         });
 
         es.addEventListener("verification_update", (e) => {
           const data = JSON.parse(e.data);
-          store.updateRepoVerification(data.repo_url, data.verification);
+          useScoutStore.getState().updateRepoVerification(data.repo_url, data.verification);
         });
 
         es.addEventListener("observation", (e) => {
           const data = JSON.parse(e.data);
-          store.addObservation(data.text);
+          useScoutStore.getState().addObservation(data.text);
         });
 
         es.addEventListener("curated_list", (e) => {
           const data = JSON.parse(e.data);
-          store.addCuratedList(data);
+          useScoutStore.getState().addCuratedList(data);
         });
 
         es.addEventListener("industry_tool", (e) => {
           const data = JSON.parse(e.data);
-          store.addIndustryTool(data);
+          useScoutStore.getState().addIndustryTool(data);
         });
 
         es.addEventListener("search_error", (e) => {
@@ -144,8 +143,8 @@ export function useScoutStream(searchId: string | null) {
             const data = JSON.parse((e as MessageEvent).data);
             if (data.recoverable) {
               setError((data.message || "Something went wrong") + " — partial results shown below");
-              store.setPhase1Complete(true);
-              store.setIsSearching(false);
+              useScoutStore.getState().setPhase1Complete(true);
+              useScoutStore.getState().setIsSearching(false);
               setIsComplete(true);
               es.close();
             } else {
@@ -158,8 +157,8 @@ export function useScoutStream(searchId: string | null) {
 
         es.addEventListener("phase1_complete", () => {
           setIsComplete(true);
-          store.setPhase1Complete(true);
-          store.setIsSearching(false);
+          useScoutStore.getState().setPhase1Complete(true);
+          useScoutStore.getState().setIsSearching(false);
           es.close();
         });
 
@@ -169,6 +168,7 @@ export function useScoutStream(searchId: string | null) {
             es.close();
             setTimeout(connect, 1000 * reconnectAttemptsRef.current);
           } else {
+            es.close();
             setError("Connection lost. Please refresh the page.");
             setIsConnected(false);
           }

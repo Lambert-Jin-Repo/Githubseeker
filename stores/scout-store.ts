@@ -80,7 +80,11 @@ export const useScoutStore = create<ScoutStore>((set) => ({
   setMode: (mode) => set({ mode }),
   setIsSearching: (v) => set({ isSearching: v }),
 
-  addRepo: (repo) => set((s) => ({ repos: [...s.repos, repo] })),
+  addRepo: (repo) => set((s) => ({
+    repos: s.repos.some((r) => r.repo_url === repo.repo_url)
+      ? s.repos
+      : [...s.repos, repo],
+  })),
 
   updateRepoVerification: (url, verification) =>
     set((s) => ({
@@ -125,7 +129,11 @@ export const useScoutStore = create<ScoutStore>((set) => ({
     }),
 
   addDeepDiveResult: (result) =>
-    set((s) => ({ deepDiveResults: [...s.deepDiveResults, result] })),
+    set((s) => ({
+      deepDiveResults: s.deepDiveResults.some((r) => r.repo_url === result.repo_url)
+        ? s.deepDiveResults
+        : [...s.deepDiveResults, result],
+    })),
 
   setSummary: (summary) => set({ summary }),
   setIsDeepDiving: (v) => set({ isDeepDiving: v }),
