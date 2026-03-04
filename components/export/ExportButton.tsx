@@ -218,6 +218,7 @@ export function ExportButton({
           variant="outline"
           size="sm"
           className="gap-2 text-muted-foreground hover:text-foreground"
+          data-export-trigger="true"
         >
           <Download className="size-4" />
           Export

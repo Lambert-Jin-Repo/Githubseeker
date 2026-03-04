@@ -3,6 +3,7 @@ import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
 import { GlobalSearchStreamListener } from "@/components/shared/GlobalSearchStreamListener";
 import { MouseTracker } from "@/components/shared/MouseTracker";
+import { KeyboardShortcutProvider } from "@/components/shared/KeyboardShortcutProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -22,6 +23,7 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <MouseTracker />
           <GlobalSearchStreamListener />
+          <KeyboardShortcutProvider />
           <div className="relative flex min-h-screen flex-col z-10">
             {children}
           </div>
