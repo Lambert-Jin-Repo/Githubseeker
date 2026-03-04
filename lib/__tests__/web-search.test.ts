@@ -39,6 +39,63 @@ describe("webSearch", () => {
   });
 });
 
+describe("webSearch error paths", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("throws with status and body on non-OK response", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      text: () => Promise.resolve("Rate limit exceeded"),
+    }));
+
+    await expect(webSearch("test query")).rejects.toThrow(
+      "Serper API error: 429 Rate limit exceeded"
+    );
+  });
+
+  it("includes status even when body read fails", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      text: () => Promise.reject(new Error("body read error")),
+    }));
+
+    await expect(webSearch("test query")).rejects.toThrow(
+      "Serper API error: 500"
+    );
+  });
+
+  it("throws on network failure", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(
+      new TypeError("fetch failed")
+    ));
+
+    await expect(webSearch("test query")).rejects.toThrow("fetch failed");
+  });
+
+  it("throws on malformed JSON response", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.reject(new SyntaxError("Unexpected token")),
+    }));
+
+    await expect(webSearch("test query")).rejects.toThrow("Unexpected token");
+  });
+
+  it("returns empty array when organic field is missing from response", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({}),
+    }));
+
+    const results = await webSearch("test query");
+    expect(results).toEqual([]);
+  });
+});
+
 // Minimal GitHub HTML fixture with metadata markers
 function buildGitHubHtml(overrides: Partial<{
   stars: string;

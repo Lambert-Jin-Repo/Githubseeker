@@ -132,6 +132,70 @@
 
 ---
 
+## Phase 10: Code Quality Hardening (COMPLETE — 25 tasks, 5 commits)
+
+**Date:** 2026-03-04
+**Plan:** `docs/plans/2026-03-04-code-quality-hardening-plan.md`
+**Trigger:** Full code review (5 parallel agents: API routes, core libs, hooks/stores, tests, external APIs)
+**Findings:** 8 critical, ~20 major, ~25 minor issues across security, reliability, modular design, and test coverage
+
+### Group A: Security & Auth Fixes (Critical)
+| # | Task | Status | Files |
+|---|---|---|---|
+| A1 | Fix legacy auth on V1 deep-dive + dashboard routes | `done` | `deep-dive/route.ts`, `dashboard/route.ts` |
+| A2 | Add auth + input limits to feedback route | `done` | `feedback/route.ts` |
+| A3 | Make rate limiting atomic (Supabase RPC) | `done` | `lib/rate-limit.ts`, Supabase migration |
+| A4 | Add auth check + input caps to SSE GET + deep dive routes | `done` | `scout/route.ts`, `deep-dive/route.ts`, `deep-dive-v2/route.ts` |
+
+### Group B: API Reliability (Critical + Major)
+| # | Task | Status | Files |
+|---|---|---|---|
+| B1 | Add timeout + retry to LLM client, guard JSON.parse | `done` | `lib/llm.ts` |
+| B2 | Add timeout to Serper fetch | `done` | `lib/web-search.ts` |
+| B3 | Add abort signal on SSE client disconnect | `done` | `scout/route.ts`, `lib/llm.ts` |
+| B4 | Fall back to Supabase when pendingSearches misses | `done` | `scout/route.ts` |
+| B5 | Add env var validation (replace `!` assertions) | `done` | `lib/llm.ts`, `lib/web-search.ts`, `lib/supabase.ts` |
+
+### Group C: Client-Side Fixes (Critical + Major)
+| # | Task | Status | Files |
+|---|---|---|---|
+| C1 | Fix EventSource close on reconnect exhaustion | `done` | `useScoutStream.ts`, `useGlobalSearchStream.ts` |
+| C2 | Fix full store subscription in useScoutStream | `done` | `useScoutStream.ts` |
+| C3 | Add dedup to `addRepo` + V1 `addDeepDiveResult` | `done` | `scout-store.ts` |
+| C4 | Add AbortController cleanup on unmount (deep dive hooks) | `done` | `useDeepDiveStream.ts`, `useDeepDiveStreamV2.ts` |
+| C5 | Fix stale closure over `completedCount` | `done` | `useDeepDiveStream.ts`, `useDeepDiveStreamV2.ts` |
+
+### Group D: Modular Design Refactors (Major)
+| # | Task | Status | Files |
+|---|---|---|---|
+| D1 | Extract SSE utilities to `lib/sse.ts` | `done` | 3 route files → new `lib/sse.ts` |
+| D2 | Extract `extractJSON` to `lib/text-utils.ts` | `done` | `deep-dive-analyzer.ts`, `deep-dive-analyzer-v2.ts` |
+| D3 | Consolidate `SESSION_COOKIE_NAME` constant | `done` | `lib/session.ts`, `lib/supabase.ts` |
+| D4 | Extract `persistDeepDive` to `lib/persistence.ts` | `done` | both analyzers → new `lib/persistence.ts` |
+| D5 | Extract duplicated `parseSSEEvents` to `lib/sse-parser.ts` | `done` | both deep dive hooks → new `lib/sse-parser.ts` |
+
+### Group E: Test Coverage (Major)
+| # | Task | Status | Files |
+|---|---|---|---|
+| E1 | Add V1 parser unit tests | `done` | new `lib/__tests__/deep-dive-analyzer.test.ts` |
+| E2 | Add malformed-input tests for V2 parsers | `done` | `lib/__tests__/deep-dive-analyzer-v2.test.ts` |
+| E3 | Add scout POST route handler tests | `done` | new `app/api/scout/__tests__/route.test.ts` |
+| E4 | Add feedback route tests | `done` | new `app/api/feedback/__tests__/route.test.ts` |
+| E5 | Test `webSearch` error paths | `done` | `lib/__tests__/web-search.test.ts` |
+| E6 | Test `getOrCreateSessionId` | `done` | `lib/__tests__/session.test.ts` |
+
+### API Cost Optimization (COMPLETE — 2026-03-04)
+| # | Task | Status | Files |
+|---|---|---|---|
+| 1 | Precompute only Tier 1 repos (top 5) | `done` | `app/api/scout/route.ts` |
+| 2 | Batch ecosystem search across precomputed repos | `done` | `lib/deep-dive-analyzer-v2.ts` |
+| 3 | Trim data context (drop repoPageHtml, reduce tree) | `done` | `lib/deep-dive-analyzer-v2.ts` |
+| 4 | Tests for batch function | `done` | `lib/__tests__/deep-dive-analyzer-v2.test.ts` |
+
+**Impact:** ~75% reduction in LLM cost + Serper credits per search
+
+---
+
 ## Phase 3: Polish & Robustness (NOT STARTED)
 
 | # | Task | Priority | Status | Description |
@@ -158,7 +222,7 @@
 | Search | Serper API (Google Search) at `google.serper.dev/search` |
 | Database | Supabase (project: `fnylozxqgmnzvdbshzvn`, region: ap-southeast-1, free plan) |
 | State | Zustand |
-| Testing | Vitest (86 tests, 12 files) |
+| Testing | Vitest (206 tests, 18 files) |
 | Fonts | Literata (headings), Atkinson Hyperlegible Next (body), JetBrains Mono (code) |
 
 ## Key Files
