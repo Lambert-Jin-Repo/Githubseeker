@@ -1,13 +1,19 @@
 import OpenAI from "openai";
 import type { ChatCompletionTool } from "openai/resources/chat/completions";
 import { webSearch, fetchWebPage, fetchGitHubMetadata } from "./web-search";
+import { getProvider } from "./llm-provider";
 
-const client = new OpenAI({
-  apiKey: process.env.MINIMAX_API_KEY || "",
-  baseURL: "https://api.minimaxi.com/v1",
-  timeout: 60000,
-  maxRetries: 2,
-});
+const provider = getProvider();
+const MODEL = provider.defaultModel;
+
+// Lazy-initialized client to avoid side effects at module import time
+let _client: OpenAI | null = null;
+function getClient(): OpenAI {
+  if (!_client) {
+    _client = provider.createClient();
+  }
+  return _client;
+}
 
 const SCOUT_TOOLS: ChatCompletionTool[] = [
   {
@@ -103,8 +109,8 @@ export async function callLLMWithTools(
 
   // Pure completion mode — no tools, no exhaustion message
   if (maxToolRounds === 0) {
-    const response = await client.chat.completions.create({
-      model: "MiniMax-M2.5",
+    const response = await getClient().chat.completions.create({
+      model: MODEL,
       max_tokens: 16384,
       messages,
     });
@@ -118,8 +124,8 @@ export async function callLLMWithTools(
         : "";
     }
 
-    const response = await client.chat.completions.create({
-      model: "MiniMax-M2.5",
+    const response = await getClient().chat.completions.create({
+      model: MODEL,
       max_tokens: 16384,
       messages,
       tools: SCOUT_TOOLS,
@@ -193,8 +199,8 @@ export async function callLLMWithTools(
     content: "You have used all available tool calls. Based on the information gathered so far, return your final structured JSON response now. Do NOT use any more tools. Return ONLY the JSON object.",
   });
 
-  const finalResponse = await client.chat.completions.create({
-    model: "MiniMax-M2.5",
+  const finalResponse = await getClient().chat.completions.create({
+    model: MODEL,
     max_tokens: 16384,
     messages,
   });
@@ -202,4 +208,6 @@ export async function callLLMWithTools(
   return finalResponse.choices[0]?.message?.content || "";
 }
 
-export { client, SCOUT_TOOLS };
+export { SCOUT_TOOLS };
+/** Lazy-initialized OpenAI client. Prefer using callLLMWithTools instead. */
+export { getClient as client };
