@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { toast } from "sonner";
 import { useSearchNotificationStore } from "@/stores/search-notification-store";
 import { useScoutStore } from "@/stores/scout-store";
 
@@ -93,12 +94,14 @@ export function useGlobalSearchStream() {
                     try {
                         const data = JSON.parse((e as MessageEvent).data);
                         if (data.recoverable) {
+                            toast.warning("Search partially completed. Showing available results.");
                             notifStore.getState().setComplete();
                             scoutStore.getState().setPhase1Complete(true);
                             scoutStore.getState().setIsSearching(false);
                             es.close();
                         } else {
                             notifStore.getState().setError(data.message || "Search failed");
+                            toast.error("Search failed. Please try again.");
                         }
                     } catch {
                         // Native EventSource error, handled by es.onerror
@@ -120,6 +123,7 @@ export function useGlobalSearchStream() {
                     } else {
                         es.close();
                         notifStore.getState().setError("Connection lost. Please try again.");
+                        toast.error("Connection lost. Check your internet and try again.");
                     }
                 };
             };

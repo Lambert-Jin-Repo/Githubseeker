@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { motion } from "framer-motion";
 import {
     Search,
@@ -102,6 +103,7 @@ export function DashboardContent() {
             setData(json);
         } catch {
             setError(true);
+            toast.error("Failed to load dashboard. Please try again.");
         } finally {
             setLoading(false);
         }

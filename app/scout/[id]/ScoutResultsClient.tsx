@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { useScoutStream } from "@/hooks/useScoutStream";
 import { useScoutStore } from "@/stores/scout-store";
 import { Header } from "@/components/shared/Header";
@@ -78,9 +79,14 @@ export function ScoutResultsClient({ searchId }: ScoutResultsClientProps) {
   }, [phase1Complete, isLoadingSaved, isCached, repos.length, showResults]);
 
   // For cached / saved results, skip straight to results
+  const cacheToastShown = useRef(false);
   useEffect(() => {
     if (isLoadingSaved === false && phase1Complete && isCached) {
       setShowResults(true);
+      if (!cacheToastShown.current) {
+        cacheToastShown.current = true;
+        toast.info("Loaded from cache");
+      }
     }
   }, [isLoadingSaved, phase1Complete, isCached]);
 
