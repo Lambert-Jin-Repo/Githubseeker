@@ -138,11 +138,13 @@ export function DeepDivePageClient({ searchId }: DeepDivePageClientProps) {
         repoCount={repoUrls.length}
       />
 
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:grid lg:grid-cols-[200px_1fr] lg:gap-8">
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 md:grid md:grid-cols-[200px_1fr] md:gap-6 lg:gap-8">
+        {/* Sidebar renders: mobile tab bar (md:hidden) + desktop aside (hidden md:block).
+            On mobile the tab bar is sticky full-width; on md+ the aside is a grid column. */}
         <DeepDiveSidebar items={sidebarItems} />
 
         <motion.main
-          className="space-y-8"
+          className="space-y-6 md:space-y-8"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
@@ -181,7 +183,7 @@ export function DeepDivePageClient({ searchId }: DeepDivePageClientProps) {
           )}
 
           {/* Section: Overview */}
-          <section id="overview" className="scroll-mt-24">
+          <section id="overview" className="scroll-mt-36 md:scroll-mt-24">
             {isComplete && summaryV2 ? (
               <ExecutiveSummary summary={summaryV2} mode={mode || "SCOUT"} />
             ) : (
@@ -190,7 +192,7 @@ export function DeepDivePageClient({ searchId }: DeepDivePageClientProps) {
           </section>
 
           {/* Section: Compare */}
-          <section id="compare" className="scroll-mt-24">
+          <section id="compare" className="scroll-mt-36 md:scroll-mt-24">
             {isComplete && summaryV2 ? (
               <ComparativeMatrix summary={summaryV2} />
             ) : (
@@ -205,7 +207,7 @@ export function DeepDivePageClient({ searchId }: DeepDivePageClientProps) {
             const result = deepDiveResultsV2.find((r) => r.repo_url === url);
 
             return (
-              <section key={url} id={sectionId} className="scroll-mt-24">
+              <section key={url} id={sectionId} className="scroll-mt-36 md:scroll-mt-24">
                 {result ? (
                   <RepoAnalysisCard
                     result={result}
@@ -220,7 +222,7 @@ export function DeepDivePageClient({ searchId }: DeepDivePageClientProps) {
           })}
 
           {/* Section: Gaps & Opportunities */}
-          <section id="gaps" className="scroll-mt-24">
+          <section id="gaps" className="scroll-mt-36 md:scroll-mt-24">
             {isComplete && summaryV2 ? (
               <EcosystemGaps gaps={summaryV2.ecosystem_gaps} />
             ) : (

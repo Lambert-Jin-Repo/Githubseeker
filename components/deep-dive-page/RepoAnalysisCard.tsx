@@ -71,11 +71,11 @@ export function RepoAnalysisCard({
 
   return (
     <Card
-      className="animate-slide-up overflow-hidden rounded-lg border border-border/50 bg-card"
+      className="animate-slide-up overflow-hidden rounded-lg border border-border/50 bg-card py-4 sm:py-6"
       style={{ animationDelay: `${index * 100}ms` }}
     >
       {/* ── Header ── */}
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-2 px-4 sm:px-6">
         <div className="space-y-3">
           {/* Repo name and link */}
           <div className="flex items-start justify-between gap-2 sm:gap-4">
@@ -152,7 +152,7 @@ export function RepoAnalysisCard({
       </CardHeader>
 
       {/* ── Sections ── */}
-      <CardContent className="divide-y divide-border/30">
+      <CardContent className="divide-y divide-border/30 px-4 sm:px-6">
         {/* 1. Overview */}
         <div className="py-5 first:pt-0">
           <EnhancedSectionDisplay section={result.overview} />

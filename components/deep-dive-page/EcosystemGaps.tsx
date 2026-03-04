@@ -6,8 +6,8 @@ interface EcosystemGapsProps {
 
 export function EcosystemGaps({ gaps }: EcosystemGapsProps) {
   return (
-    <div className="rounded-lg border border-border/50 bg-card p-6 space-y-5">
-      <h2 className="font-serif text-xl text-foreground">
+    <div className="rounded-lg border border-border/50 bg-card px-4 py-5 sm:p-6 space-y-4 sm:space-y-5">
+      <h2 className="font-serif text-lg sm:text-xl text-foreground">
         Ecosystem Gaps &amp; Opportunities
       </h2>
 
