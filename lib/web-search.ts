@@ -13,14 +13,16 @@ export async function webSearch(
   const response = await fetch(SERPER_API_URL, {
     method: "POST",
     headers: {
-      "X-API-KEY": process.env.SERPER_API_KEY!,
+      "X-API-KEY": process.env.SERPER_API_KEY || "",
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ q: query, num: count }),
+    signal: AbortSignal.timeout(10000),
   });
 
   if (!response.ok) {
-    throw new Error(`Serper API error: ${response.status}`);
+    const body = await response.text().catch(() => "");
+    throw new Error(`Serper API error: ${response.status} ${body}`.trim());
   }
 
   const data = await response.json();

@@ -278,32 +278,43 @@ export async function GET(request: NextRequest) {
   const authClient = await createAuthServerClient();
   const { userId } = await getSessionUserIdFromAuth(request, authClient);
 
-  const searchParams = pendingSearches.get(searchId);
+  // Try in-memory map first, fall back to Supabase for serverless compatibility (B4)
+  let searchParams = pendingSearches.get(searchId);
   if (!searchParams) {
-    return NextResponse.json({ error: "Search not found or expired" }, { status: 404 });
-  }
+    const db = createServerClient();
+    const { data: row } = await db
+      .from("searches")
+      .select("query, mode")
+      .eq("id", searchId)
+      .eq("user_id", userId)
+      .single();
 
-  // Verify ownership: check that the persisted search row belongs to this user
-  const db = createServerClient();
-  const { data: searchRow } = await db
-    .from("searches")
-    .select("id")
-    .eq("id", searchId)
-    .eq("user_id", userId)
-    .single();
+    if (!row) {
+      return NextResponse.json({ error: "Search not found or expired" }, { status: 404 });
+    }
+    searchParams = { query: row.query, mode: row.mode as ScoutMode };
+  } else {
+    // Verify ownership when found in memory
+    const db = createServerClient();
+    const { data: searchRow } = await db
+      .from("searches")
+      .select("id")
+      .eq("id", searchId)
+      .eq("user_id", userId)
+      .single();
 
-  if (!searchRow) {
-    return NextResponse.json({ error: "Search not found" }, { status: 404 });
+    if (!searchRow) {
+      return NextResponse.json({ error: "Search not found" }, { status: 404 });
+    }
   }
 
   const { query, mode } = searchParams;
 
   const encoder = new TextEncoder();
-  let controllerRef: ReadableStreamDefaultController | null = null;
+  const abortController = new AbortController();
 
   const stream = new ReadableStream({
     start(controller) {
-      controllerRef = controller;
 
       // Track search strategies as they happen
       const strategiesSeen = new Set<string>();
@@ -414,6 +425,7 @@ export async function GET(request: NextRequest) {
           }
         },
         maxToolRounds: isVagueQuery ? 10 : 8,
+        signal: abortController.signal,
       })
         .then(async (finalResponse) => {
           // Parse the JSON response from LLM
@@ -571,8 +583,8 @@ export async function GET(request: NextRequest) {
         });
     },
     cancel() {
-      // Client disconnected
-      controllerRef = null;
+      // Client disconnected — abort in-flight LLM/tool calls
+      abortController.abort();
     },
   });
 

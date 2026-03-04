@@ -1,9 +1,10 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import type { NextRequest } from "next/server";
 import { isValidSessionId } from "./session";
+import { requireEnv } from "./env";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
+const supabaseUrl = requireEnv("NEXT_PUBLIC_SUPABASE_URL");
+const supabasePublishableKey = requireEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
 
 // Client-side Supabase client (uses publishable key)
 export const supabase = createClient(supabaseUrl, supabasePublishableKey);
@@ -14,7 +15,7 @@ let _serverClient: SupabaseClient | null = null;
 // Server-side Supabase client (uses service role key, bypasses RLS)
 export function createServerClient() {
   if (_serverClient) return _serverClient;
-  const secretKey = process.env.SUPABASE_SECRET_KEY!;
+  const secretKey = requireEnv("SUPABASE_SECRET_KEY");
   _serverClient = createClient(supabaseUrl, secretKey);
   return _serverClient;
 }

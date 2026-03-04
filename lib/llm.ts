@@ -3,8 +3,10 @@ import type { ChatCompletionTool } from "openai/resources/chat/completions";
 import { webSearch, fetchWebPage, fetchGitHubMetadata } from "./web-search";
 
 const client = new OpenAI({
-  apiKey: process.env.MINIMAX_API_KEY!,
+  apiKey: process.env.MINIMAX_API_KEY || "",
   baseURL: "https://api.minimaxi.com/v1",
+  timeout: 60000,
+  maxRetries: 2,
 });
 
 const SCOUT_TOOLS: ChatCompletionTool[] = [
@@ -78,6 +80,7 @@ export interface LLMCallOptions {
   onToolResult?: (toolName: string, result: string) => void;
   onToolError?: (toolName: string, error: Error) => void;
   maxToolRounds?: number;
+  signal?: AbortSignal;
 }
 
 export async function callLLMWithTools(
@@ -90,6 +93,7 @@ export async function callLLMWithTools(
     onToolResult,
     onToolError,
     maxToolRounds = 10,
+    signal,
   } = options;
 
   const messages: OpenAI.ChatCompletionMessageParam[] = [
@@ -108,6 +112,12 @@ export async function callLLMWithTools(
   }
 
   for (let round = 0; round < maxToolRounds; round++) {
+    if (signal?.aborted) {
+      return messages[messages.length - 1]?.role === "assistant"
+        ? (messages[messages.length - 1] as { content?: string }).content || ""
+        : "";
+    }
+
     const response = await client.chat.completions.create({
       model: "MiniMax-M2.5",
       max_tokens: 16384,
@@ -117,6 +127,9 @@ export async function callLLMWithTools(
     });
 
     const choice = response.choices[0];
+    if (!choice) {
+      return "";
+    }
     const message = choice.message;
     messages.push(message);
 
@@ -127,12 +140,27 @@ export async function callLLMWithTools(
     // Execute all tool calls in parallel for concurrency
     const functionCalls = message.tool_calls.filter(tc => tc.type === "function");
     for (const tc of functionCalls) {
-      onToolCall?.(tc.function.name, JSON.parse(tc.function.arguments));
+      let args: Record<string, unknown>;
+      try {
+        args = JSON.parse(tc.function.arguments);
+      } catch {
+        args = {};
+      }
+      onToolCall?.(tc.function.name, args);
+    }
+
+    if (signal?.aborted) {
+      return message.content || "";
     }
 
     const results = await Promise.allSettled(
       functionCalls.map(async (tc) => {
-        const args = JSON.parse(tc.function.arguments);
+        let args: Record<string, unknown>;
+        try {
+          args = JSON.parse(tc.function.arguments);
+        } catch {
+          args = {};
+        }
         try {
           return await executeToolCall(tc.function.name, args);
         } catch (err) {
