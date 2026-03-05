@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 
 const PROVIDER_COLORS: Record<string, string> = {
   minimax: "#0F766E",
@@ -197,9 +197,8 @@ export function RecentCallsTable({ calls }: RecentCallsTableProps) {
           </thead>
           <tbody>
             {sorted.map((call, i) => (
-              <>
+              <Fragment key={`row-${i}`}>
                 <tr
-                  key={`row-${i}`}
                   className="border-b border-border/50 hover:bg-background/50 cursor-pointer transition-colors"
                   onClick={() => setExpandedRow(expandedRow === i ? null : i)}
                 >
@@ -287,7 +286,7 @@ export function RecentCallsTable({ calls }: RecentCallsTableProps) {
                     </td>
                   </tr>
                 )}
-              </>
+              </Fragment>
             ))}
           </tbody>
         </table>
