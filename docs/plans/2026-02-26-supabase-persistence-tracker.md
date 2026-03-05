@@ -104,8 +104,37 @@
 
 ---
 
+## Phase 12: Admin Panel — API Usage Monitoring Dashboard (COMPLETE)
+
+**Completed:** 2026-03-05
+**Design:** `docs/plans/2026-03-05-admin-panel-design.md`
+**Plan:** `docs/plans/2026-03-05-admin-panel-plan.md`
+
+| # | Task | Status | Files |
+|---|---|---|---|
+| 1 | Database migration — `api_usage_logs` + `profiles` tables | `done` | Supabase MCP migration |
+| 2 | Logging infrastructure — fire-and-forget logger | `done` | `lib/api-logger.ts`, `lib/__tests__/api-logger.test.ts` |
+| 3 | Integrate logging into LLM agentic loop | `done` | `lib/llm.ts` |
+| 4 | Integrate logging into Serper + GitHub fetch | `done` | `lib/web-search.ts` |
+| 5 | Pass searchId from route handlers | `done` | `app/api/scout/route.ts`, `app/api/scout/[id]/deep-dive-v2/route.ts`, `lib/deep-dive-analyzer-v2.ts` |
+| 6 | Admin auth middleware | `done` | `lib/admin-auth.ts` |
+| 7 | Metrics API endpoint | `done` | `app/api/admin/metrics/route.ts` |
+| 8 | Search analytics endpoint | `done` | `app/api/admin/search-analytics/route.ts` |
+| 9 | Install Recharts | `done` | `package.json` |
+| 10 | Admin login page | `done` | `app/admin/login/page.tsx` |
+| 11 | Dashboard page | `done` | `app/admin/llm-usage/page.tsx` |
+| 12 | Dashboard components (8 Recharts) | `done` | `app/admin/llm-usage/components/` (9 files) |
+| 13 | Final polish + verification | `done` | — |
+
+**Summary:** Fire-and-forget API usage logging on all LLM, Serper, and GitHub fetch calls. Admin-only dashboard at `/admin/llm-usage` with Supabase Auth + `is_admin` flag. Recharts visualization: 6 metric cards with animated count-up, cost timeline, provider breakdown donut, operation bar chart, error log, search analytics panel, sortable recent calls table. Auto-refresh (15s), time range filter (today/7d/30d), responsive 2-col layout.
+
+**New files:** 15
+**Modified files:** 5 (`lib/llm.ts`, `lib/web-search.ts`, `app/api/scout/route.ts`, `app/api/scout/[id]/deep-dive-v2/route.ts`, `lib/deep-dive-analyzer-v2.ts`)
+
+---
+
 ## Tests
 
-256/256 passing (21 test files), TypeScript compiles clean
+269/269 passing (22 test files), TypeScript compiles clean, Next.js build passes
 
-*Updated 2026-03-05 after SSE reconnection bug fix*
+*Updated 2026-03-05 after admin panel implementation*
