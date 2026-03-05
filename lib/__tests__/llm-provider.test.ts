@@ -41,7 +41,7 @@ describe("llm-provider", () => {
     it("returns MiniMax provider by default when LLM_PROVIDER is not set", () => {
       const provider = getProvider();
       expect(provider.name).toBe("minimax");
-      expect(provider.defaultModel).toBe("MiniMax-M1");
+      expect(provider.defaultModel).toBe("MiniMax-M2.5");
       expect(provider.supportsToolCalling).toBe(true);
     });
 
@@ -49,7 +49,7 @@ describe("llm-provider", () => {
       process.env.LLM_PROVIDER = "minimax";
       const provider = getProvider();
       expect(provider.name).toBe("minimax");
-      expect(provider.defaultModel).toBe("MiniMax-M1");
+      expect(provider.defaultModel).toBe("MiniMax-M2.5");
       expect(provider.apiKeyEnvVar).toBe("MINIMAX_API_KEY");
     });
 
