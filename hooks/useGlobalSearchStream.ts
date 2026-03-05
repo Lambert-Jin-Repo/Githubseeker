@@ -14,6 +14,7 @@ export function useGlobalSearchStream() {
     const eventSourceRef = useRef<EventSource | null>(null);
     const reconnectAttemptsRef = useRef(0);
     const activeSearchIdRef = useRef<string | null>(null);
+    const serverErrorReceivedRef = useRef(false);
 
     useEffect(() => {
         const notifStore = useSearchNotificationStore;
@@ -24,6 +25,7 @@ export function useGlobalSearchStream() {
             eventSourceRef.current?.close();
             activeSearchIdRef.current = searchId;
             reconnectAttemptsRef.current = 0;
+            serverErrorReceivedRef.current = false;
 
             const connect = () => {
                 // Bail if a different search has started since
@@ -93,6 +95,8 @@ export function useGlobalSearchStream() {
                 es.addEventListener("error", (e) => {
                     try {
                         const data = JSON.parse((e as MessageEvent).data);
+                        // Mark that server sent an explicit error — prevent onerror reconnection
+                        serverErrorReceivedRef.current = true;
                         if (data.recoverable) {
                             toast.warning("Search partially completed. Showing available results.");
                             notifStore.getState().setComplete();
@@ -102,6 +106,7 @@ export function useGlobalSearchStream() {
                         } else {
                             notifStore.getState().setError(data.message || "Search failed");
                             toast.error("Search failed. Please try again.");
+                            es.close();
                         }
                     } catch {
                         // Native EventSource error, handled by es.onerror
@@ -116,6 +121,11 @@ export function useGlobalSearchStream() {
                 });
 
                 es.onerror = () => {
+                    // Don't reconnect if the server already sent an explicit error event
+                    if (serverErrorReceivedRef.current) {
+                        es.close();
+                        return;
+                    }
                     if (reconnectAttemptsRef.current < 3) {
                         reconnectAttemptsRef.current += 1;
                         es.close();

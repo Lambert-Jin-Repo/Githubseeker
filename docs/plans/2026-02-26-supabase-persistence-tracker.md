@@ -93,8 +93,19 @@
 
 ---
 
+## Bug Fix: SSE Infinite Reconnection Loop (2026-03-05)
+
+**Root cause:** When MiniMax API returns 429 (rate limit), the SSE error event handler closes the EventSource, but the native `onerror` handler fires immediately after. Since `onopen` resets `reconnectAttemptsRef` to 0 on every successful HTTP 200 connection, the retry counter never reaches 3, causing an infinite reconnection loop with a new toast notification on each cycle.
+
+| # | Fix | Status | Files |
+|---|---|---|---|
+| 1 | Add `serverErrorReceivedRef` flag to prevent onerror reconnection after explicit server error | `done` | `hooks/useGlobalSearchStream.ts`, `hooks/useScoutStream.ts` |
+| 2 | Close EventSource on non-recoverable errors (was missing `es.close()`) | `done` | `hooks/useGlobalSearchStream.ts`, `hooks/useScoutStream.ts` |
+
+---
+
 ## Tests
 
-206/206 passing (18 test files), TypeScript compiles clean
+256/256 passing (21 test files), TypeScript compiles clean
 
-*Updated 2026-03-04 after Phase 10 Code Quality Hardening (95 new tests across 6 new/modified test files)*
+*Updated 2026-03-05 after SSE reconnection bug fix*

@@ -13,6 +13,7 @@ export function useScoutStream(searchId: string | null) {
   const reconnectAttemptsRef = useRef(0);
   const eventSourceRef = useRef<EventSource | null>(null);
   const queryRef = useRef<string | null>(null);
+  const serverErrorReceivedRef = useRef(false);
 
   useEffect(() => {
     if (!searchId) {
@@ -76,6 +77,7 @@ export function useScoutStream(searchId: string | null) {
       if (cancelled) return;
 
       // Fall back to SSE stream
+      serverErrorReceivedRef.current = false;
       const connect = () => {
         const es = new EventSource(`/api/scout?id=${searchId}`);
         eventSourceRef.current = es;
@@ -142,6 +144,8 @@ export function useScoutStream(searchId: string | null) {
           // This handles the custom "error" SSE event (not the native EventSource error)
           try {
             const data = JSON.parse((e as MessageEvent).data);
+            // Mark that server sent an explicit error — prevent onerror reconnection
+            serverErrorReceivedRef.current = true;
             if (data.recoverable) {
               setError((data.message || "Something went wrong") + " — partial results shown below");
               toast.warning("Search partially completed. Showing available results.");
@@ -152,6 +156,7 @@ export function useScoutStream(searchId: string | null) {
             } else {
               setError(data.message || "Search failed");
               toast.error("Search failed. Please try again.");
+              es.close();
             }
           } catch {
             // Not a JSON payload — might be a native EventSource error, handled by es.onerror
@@ -166,6 +171,11 @@ export function useScoutStream(searchId: string | null) {
         });
 
         es.onerror = () => {
+          // Don't reconnect if the server already sent an explicit error event
+          if (serverErrorReceivedRef.current) {
+            es.close();
+            return;
+          }
           if (reconnectAttemptsRef.current < 3) {
             reconnectAttemptsRef.current += 1;
             es.close();
