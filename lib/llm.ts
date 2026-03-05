@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import type { ChatCompletionTool } from "openai/resources/chat/completions";
 import { webSearch, fetchWebPage, fetchGitHubMetadata } from "./web-search";
 import { getProvider } from "./llm-provider";
+import { logLLMCall } from "./api-logger";
 
 const provider = getProvider();
 const MODEL = provider.defaultModel;
@@ -52,33 +53,6 @@ const SCOUT_TOOLS: ChatCompletionTool[] = [
   },
 ];
 
-async function executeToolCall(
-  name: string,
-  args: Record<string, unknown>
-): Promise<string> {
-  switch (name) {
-    case "web_search": {
-      const results = await webSearch(
-        args.query as string,
-        (args.count as number) || 10
-      );
-      return JSON.stringify(results);
-    }
-    case "web_fetch": {
-      const url = args.url as string;
-      // Route top-level GitHub repo URLs through metadata extraction (~300B vs 50KB)
-      if (/^https?:\/\/github\.com\/[^/]+\/[^/]+\/?$/.test(url)) {
-        const meta = await fetchGitHubMetadata(url);
-        return JSON.stringify(meta);
-      }
-      const content = await fetchWebPage(url);
-      return content;
-    }
-    default:
-      return JSON.stringify({ error: `Unknown tool: ${name}` });
-  }
-}
-
 export interface LLMCallOptions {
   systemPrompt: string;
   userMessage: string;
@@ -87,6 +61,8 @@ export interface LLMCallOptions {
   onToolError?: (toolName: string, error: Error) => void;
   maxToolRounds?: number;
   signal?: AbortSignal;
+  searchId?: string;
+  operation?: string;
 }
 
 export async function callLLMWithTools(
@@ -100,7 +76,43 @@ export async function callLLMWithTools(
     onToolError,
     maxToolRounds = 10,
     signal,
+    searchId,
+    operation,
   } = options;
+
+  const providerName = provider.name;
+  const operationName = operation || "llm_call";
+
+  // Closure over searchId so tool calls can pass it to web-search functions
+  async function executeToolCall(
+    name: string,
+    args: Record<string, unknown>
+  ): Promise<string> {
+    switch (name) {
+      case "web_search": {
+        const results = searchId
+          ? await webSearch(args.query as string, (args.count as number) || 10, searchId)
+          : await webSearch(args.query as string, (args.count as number) || 10);
+        return JSON.stringify(results);
+      }
+      case "web_fetch": {
+        const url = args.url as string;
+        // Route top-level GitHub repo URLs through metadata extraction (~300B vs 50KB)
+        if (/^https?:\/\/github\.com\/[^/]+\/[^/]+\/?$/.test(url)) {
+          const meta = searchId
+            ? await fetchGitHubMetadata(url, searchId)
+            : await fetchGitHubMetadata(url);
+          return JSON.stringify(meta);
+        }
+        const content = searchId
+          ? await fetchWebPage(url, searchId)
+          : await fetchWebPage(url);
+        return content;
+      }
+      default:
+        return JSON.stringify({ error: `Unknown tool: ${name}` });
+    }
+  }
 
   const messages: OpenAI.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
@@ -109,12 +121,44 @@ export async function callLLMWithTools(
 
   // Pure completion mode — no tools, no exhaustion message
   if (maxToolRounds === 0) {
-    const response = await getClient().chat.completions.create({
-      model: MODEL,
-      max_tokens: 16384,
-      messages,
-    });
-    return response.choices[0]?.message?.content || "";
+    const startTime = performance.now();
+    try {
+      const response = await getClient().chat.completions.create({
+        model: MODEL,
+        max_tokens: 16384,
+        messages,
+      });
+      const latencyMs = Math.round(performance.now() - startTime);
+      if (searchId) {
+        logLLMCall({
+          search_id: searchId,
+          provider: providerName,
+          model: MODEL,
+          operation: operationName,
+          success: true,
+          latency_ms: latencyMs,
+          tokens_in: response.usage?.prompt_tokens ?? 0,
+          tokens_out: response.usage?.completion_tokens ?? 0,
+        });
+      }
+      return response.choices[0]?.message?.content || "";
+    } catch (err) {
+      const latencyMs = Math.round(performance.now() - startTime);
+      if (searchId) {
+        logLLMCall({
+          search_id: searchId,
+          provider: providerName,
+          model: MODEL,
+          operation: operationName,
+          success: false,
+          latency_ms: latencyMs,
+          tokens_in: 0,
+          tokens_out: 0,
+          error_type: err instanceof Error ? err.message : "unknown",
+        });
+      }
+      throw err;
+    }
   }
 
   for (let round = 0; round < maxToolRounds; round++) {
@@ -124,13 +168,48 @@ export async function callLLMWithTools(
         : "";
     }
 
-    const response = await getClient().chat.completions.create({
-      model: MODEL,
-      max_tokens: 16384,
-      messages,
-      tools: SCOUT_TOOLS,
-      tool_choice: "auto",
-    });
+    const startTime = performance.now();
+    let response: OpenAI.ChatCompletion;
+    try {
+      response = await getClient().chat.completions.create({
+        model: MODEL,
+        max_tokens: 16384,
+        messages,
+        tools: SCOUT_TOOLS,
+        tool_choice: "auto",
+      });
+      const latencyMs = Math.round(performance.now() - startTime);
+      if (searchId) {
+        logLLMCall({
+          search_id: searchId,
+          provider: providerName,
+          model: MODEL,
+          operation: operationName,
+          success: true,
+          latency_ms: latencyMs,
+          tokens_in: response.usage?.prompt_tokens ?? 0,
+          tokens_out: response.usage?.completion_tokens ?? 0,
+          tool_round: round + 1,
+        });
+      }
+    } catch (err) {
+      const latencyMs = Math.round(performance.now() - startTime);
+      if (searchId) {
+        logLLMCall({
+          search_id: searchId,
+          provider: providerName,
+          model: MODEL,
+          operation: operationName,
+          success: false,
+          latency_ms: latencyMs,
+          tokens_in: 0,
+          tokens_out: 0,
+          error_type: err instanceof Error ? err.message : "unknown",
+          tool_round: round + 1,
+        });
+      }
+      throw err;
+    }
 
     const choice = response.choices[0];
     if (!choice) {
@@ -199,13 +278,46 @@ export async function callLLMWithTools(
     content: "You have used all available tool calls. Based on the information gathered so far, return your final structured JSON response now. Do NOT use any more tools. Return ONLY the JSON object.",
   });
 
-  const finalResponse = await getClient().chat.completions.create({
-    model: MODEL,
-    max_tokens: 16384,
-    messages,
-  });
-
-  return finalResponse.choices[0]?.message?.content || "";
+  const exhaustedStartTime = performance.now();
+  try {
+    const finalResponse = await getClient().chat.completions.create({
+      model: MODEL,
+      max_tokens: 16384,
+      messages,
+    });
+    const latencyMs = Math.round(performance.now() - exhaustedStartTime);
+    if (searchId) {
+      logLLMCall({
+        search_id: searchId,
+        provider: providerName,
+        model: MODEL,
+        operation: operationName,
+        success: true,
+        latency_ms: latencyMs,
+        tokens_in: finalResponse.usage?.prompt_tokens ?? 0,
+        tokens_out: finalResponse.usage?.completion_tokens ?? 0,
+        metadata: { exhausted: true },
+      });
+    }
+    return finalResponse.choices[0]?.message?.content || "";
+  } catch (err) {
+    const latencyMs = Math.round(performance.now() - exhaustedStartTime);
+    if (searchId) {
+      logLLMCall({
+        search_id: searchId,
+        provider: providerName,
+        model: MODEL,
+        operation: operationName,
+        success: false,
+        latency_ms: latencyMs,
+        tokens_in: 0,
+        tokens_out: 0,
+        error_type: err instanceof Error ? err.message : "unknown",
+        metadata: { exhausted: true },
+      });
+    }
+    throw err;
+  }
 }
 
 export { SCOUT_TOOLS };

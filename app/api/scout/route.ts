@@ -347,6 +347,8 @@ export async function GET(request: NextRequest) {
       callLLMWithTools({
         systemPrompt: buildSystemPrompt(mode, isVagueQuery),
         userMessage: buildUserMessage(query, mode),
+        searchId,
+        operation: "phase1_search",
         onToolError(toolName, error) {
           if (toolName === "web_search") {
             send("search_error", {

@@ -168,6 +168,8 @@ export async function POST(
             systemPrompt,
             userMessage,
             maxToolRounds: 0,
+            searchId: id,
+            operation: "deep_dive_v2_summary",
           });
 
           const summaryJsonStr = extractJSON(summaryResponse);

@@ -1,3 +1,5 @@
+import { logSerperCall, logGitHubFetch } from "./api-logger";
+
 const SERPER_API_URL = "https://google.serper.dev/search";
 
 export interface WebSearchResult {
@@ -8,29 +10,51 @@ export interface WebSearchResult {
 
 export async function webSearch(
   query: string,
-  count: number = 20
+  count: number = 20,
+  searchId?: string
 ): Promise<WebSearchResult[]> {
-  const response = await fetch(SERPER_API_URL, {
-    method: "POST",
-    headers: {
-      "X-API-KEY": process.env.SERPER_API_KEY || "",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ q: query, num: count }),
-    signal: AbortSignal.timeout(10000),
-  });
+  const startTime = performance.now();
+  let response: Response;
+  try {
+    response = await fetch(SERPER_API_URL, {
+      method: "POST",
+      headers: {
+        "X-API-KEY": process.env.SERPER_API_KEY || "",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ q: query, num: count }),
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch (err) {
+    const latencyMs = Math.round(performance.now() - startTime);
+    if (searchId) {
+      logSerperCall({ search_id: searchId, query, success: false, latency_ms: latencyMs, error_type: "network" });
+    }
+    throw err;
+  }
 
   if (!response.ok) {
+    const latencyMs = Math.round(performance.now() - startTime);
     const body = await response.text().catch(() => "");
+    if (searchId) {
+      logSerperCall({ search_id: searchId, query, success: false, latency_ms: latencyMs, error_type: "http_" + response.status });
+    }
     throw new Error(`Serper API error: ${response.status} ${body}`.trim());
   }
 
   const data = await response.json();
-  return (data.organic || []).map((r: Record<string, string>) => ({
+  const results: WebSearchResult[] = (data.organic || []).map((r: Record<string, string>) => ({
     title: r.title,
     url: r.link,
     description: r.snippet,
   }));
+
+  const latencyMs = Math.round(performance.now() - startTime);
+  if (searchId) {
+    logSerperCall({ search_id: searchId, query, success: true, latency_ms: latencyMs });
+  }
+
+  return results;
 }
 
 export interface GitHubMetadata {
@@ -48,12 +72,26 @@ export interface GitHubMetadata {
  * Fetch a top-level GitHub repo page and extract structured metadata via regex.
  * Returns ~300 bytes of JSON instead of 50KB raw HTML.
  */
-export async function fetchGitHubMetadata(url: string): Promise<GitHubMetadata> {
-  const response = await fetch(url, {
-    headers: { "User-Agent": "GitHubScout/1.0" },
-    signal: AbortSignal.timeout(10000),
-  });
+export async function fetchGitHubMetadata(url: string, searchId?: string): Promise<GitHubMetadata> {
+  const startTime = performance.now();
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: { "User-Agent": "GitHubScout/1.0" },
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch (err) {
+    const latencyMs = Math.round(performance.now() - startTime);
+    if (searchId) {
+      logGitHubFetch({ search_id: searchId, url, success: false, latency_ms: latencyMs, error_type: "network" });
+    }
+    throw err;
+  }
   if (!response.ok) {
+    const latencyMs = Math.round(performance.now() - startTime);
+    if (searchId) {
+      logGitHubFetch({ search_id: searchId, url, success: false, latency_ms: latencyMs, error_type: "http_" + response.status });
+    }
     throw new Error(`GitHub fetch failed: ${response.status}`);
   }
   const html = await response.text();
@@ -97,15 +135,40 @@ export async function fetchGitHubMetadata(url: string): Promise<GitHubMetadata> 
   // Archived banner
   const archived = html.includes("This repository has been archived");
 
+  const latencyMs = Math.round(performance.now() - startTime);
+  if (searchId) {
+    logGitHubFetch({ search_id: searchId, url, success: true, latency_ms: latencyMs });
+  }
+
   return { url, description, stars, language, license, lastCommit, topics, archived };
 }
 
-export async function fetchWebPage(url: string): Promise<string> {
-  const response = await fetch(url, {
-    headers: { "User-Agent": "GitHubScout/1.0" },
-    signal: AbortSignal.timeout(10000),
-  });
-  if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
+export async function fetchWebPage(url: string, searchId?: string): Promise<string> {
+  const startTime = performance.now();
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: { "User-Agent": "GitHubScout/1.0" },
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch (err) {
+    const latencyMs = Math.round(performance.now() - startTime);
+    if (searchId) {
+      logGitHubFetch({ search_id: searchId, url, success: false, latency_ms: latencyMs, error_type: "network" });
+    }
+    throw err;
+  }
+  if (!response.ok) {
+    const latencyMs = Math.round(performance.now() - startTime);
+    if (searchId) {
+      logGitHubFetch({ search_id: searchId, url, success: false, latency_ms: latencyMs, error_type: "http_" + response.status });
+    }
+    throw new Error(`Fetch failed: ${response.status}`);
+  }
   const html = await response.text();
+  const latencyMs = Math.round(performance.now() - startTime);
+  if (searchId) {
+    logGitHubFetch({ search_id: searchId, url, success: true, latency_ms: latencyMs });
+  }
   return html.slice(0, 50000);
 }

@@ -1,4 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+
+// Mock api-logger to avoid Supabase env var requirement
+vi.mock("../api-logger", () => ({
+  logLLMCall: vi.fn(),
+  logSerperCall: vi.fn(),
+  logGitHubFetch: vi.fn(),
+}));
+
 import { webSearch, fetchGitHubMetadata, type GitHubMetadata } from "../web-search";
 
 describe("webSearch", () => {

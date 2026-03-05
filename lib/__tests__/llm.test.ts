@@ -11,6 +11,13 @@ vi.mock("openai", () => {
   };
 });
 
+// Mock api-logger to avoid Supabase env var requirement
+vi.mock("../api-logger", () => ({
+  logLLMCall: vi.fn(),
+  logSerperCall: vi.fn(),
+  logGitHubFetch: vi.fn(),
+}));
+
 // Mock web-search module
 vi.mock("../web-search", () => ({
   webSearch: vi.fn().mockResolvedValue([{ title: "test", url: "https://example.com", description: "desc" }]),

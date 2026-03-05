@@ -447,6 +447,7 @@ const AGENT_FILE_TYPE_MAP: Record<string, AgentEcosystemDiscovery["discovered_fi
 
 async function batchSearchAgentEcosystem(
   repos: Array<{ owner: string; repo: string; repoUrl: string }>,
+  searchId?: string,
 ): Promise<Map<string, AgentEcosystemRaw>> {
   const result = new Map<string, AgentEcosystemRaw>();
 
@@ -466,7 +467,7 @@ async function batchSearchAgentEcosystem(
     const fileTerms = AGENT_FILE_PATTERNS.map((f) => `"${f}"`).join(" OR ");
     const query = `site:github.com (${fileTerms}) ${repoTerms}`;
 
-    const searchResults = await webSearch(query, 20);
+    const searchResults = await webSearch(query, 20, searchId);
 
     for (const hit of searchResults) {
       const matchedRepo = repos.find(
@@ -494,7 +495,7 @@ async function batchSearchAgentEcosystem(
           .replace("github.com", "raw.githubusercontent.com")
           .replace("/blob/", "/");
         fetchPromises.push(
-          fetchWebPage(rawUrl)
+          fetchWebPage(rawUrl, searchId)
             .then((content) => {
               data.fileContents.set(file.path, content.slice(0, 3000));
             })
@@ -542,10 +543,10 @@ async function analyzeRepoWithData(
   const promptD = buildGroupDPrompt(data);
 
   const [responseA, responseB, responseC, responseD] = await Promise.all([
-    callLLMWithTools({ ...promptA, maxToolRounds: 0 }),
-    callLLMWithTools({ ...promptB, maxToolRounds: 0 }),
-    callLLMWithTools({ ...promptC, maxToolRounds: 0 }),
-    callLLMWithTools({ ...promptD, maxToolRounds: 0 }),
+    callLLMWithTools({ ...promptA, maxToolRounds: 0, searchId, operation: "deep_dive_v2" }),
+    callLLMWithTools({ ...promptB, maxToolRounds: 0, searchId, operation: "deep_dive_v2" }),
+    callLLMWithTools({ ...promptC, maxToolRounds: 0, searchId, operation: "deep_dive_v2" }),
+    callLLMWithTools({ ...promptD, maxToolRounds: 0, searchId, operation: "deep_dive_v2" }),
   ]);
 
   // Parse and merge results
@@ -621,7 +622,7 @@ export async function analyzeRepoV2(
     const data = await fetchRepoData(repoUrl);
 
     const repoInfo = { owner: data.owner, repo: data.repo, repoUrl };
-    const ecosystemMap = await batchSearchAgentEcosystem([repoInfo]);
+    const ecosystemMap = await batchSearchAgentEcosystem([repoInfo], searchId);
     const ecosystemContext = buildEcosystemContext(ecosystemMap.get(repoUrl));
 
     return await analyzeRepoWithData(data, repoUrl, ecosystemContext, searchId);
@@ -651,7 +652,7 @@ export async function analyzeReposV2Batch(
       repo: d.repo,
       repoUrl: d.repoUrl,
     }));
-    const ecosystemMap = await batchSearchAgentEcosystem(repoInfos);
+    const ecosystemMap = await batchSearchAgentEcosystem(repoInfos, searchId);
 
     // Analyze each repo in parallel using shared ecosystem data
     const results = await Promise.allSettled(
