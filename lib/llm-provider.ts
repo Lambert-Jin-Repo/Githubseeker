@@ -20,7 +20,7 @@ const minimaxProvider: LLMProvider = {
       maxRetries: 2,
     });
   },
-  defaultModel: "MiniMax-M1",
+  defaultModel: "MiniMax-M2.5",
   supportsToolCalling: true,
 };
 
