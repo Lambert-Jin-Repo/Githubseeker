@@ -133,8 +133,33 @@
 
 ---
 
+## Phase 11: Code Quality Refactoring (COMPLETE)
+
+**Completed:** 2026-03-06
+**Type:** Pure refactoring — no runtime behavior changes
+**Review:** Full audit covering architecture, duplication, error handling, modularity
+
+| # | Task | Status | Files |
+|---|---|---|---|
+| 1 | Safe JSON.parse — try/catch on all SSE event handlers | `done` | `hooks/useGlobalSearchStream.ts`, `hooks/useScoutStream.ts` |
+| 2 | Remove in-memory `pendingSearches` Map | `done` | `app/api/scout/route.ts` |
+| 3 | Delete orphan files (`proxy.ts`, `useDeepDiveStream.ts`) | `done` | 2 files deleted |
+| 4 | Create shared SSE client helper | `done` | `lib/sse-client.ts` (new) |
+| 5 | Refactor SSE hooks to use shared client | `done` | `useGlobalSearchStream.ts`, `useScoutStream.ts` |
+| 6 | Extract parsers to `lib/deep-dive/parsers.ts` | `done` | new, ~280 lines |
+| 7 | Extract prompts to `lib/deep-dive/prompts.ts` | `done` | new, ~240 lines |
+| 8 | Extract ecosystem to `lib/deep-dive/ecosystem.ts` | `done` | new, ~120 lines |
+| 9 | Slim `deep-dive-analyzer-v2.ts` (777→210 lines) | `done` | orchestrator only |
+| 10 | Extract `lib/scout/result-parser.ts` | `done` | new, ~160 lines |
+| 11 | Slim `route.ts` (568→424 lines) | `done` | HTTP orchestration only |
+
+**Impact:** ~600 lines of duplication eliminated, 5 new modules, 2 dead files removed, 0 tests modified
+
+---
+
 ## Tests
 
 269/269 passing (22 test files), TypeScript compiles clean, Next.js build passes
 
-*Updated 2026-03-05 after admin panel implementation*
+*Updated 2026-03-06 after code quality refactoring*
+

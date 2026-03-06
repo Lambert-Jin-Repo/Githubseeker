@@ -4,16 +4,16 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { toast } from "sonner";
 import { useScoutStore } from "@/stores/scout-store";
 import { getOrCreateSessionId } from "@/lib/session";
+import { createSSEClient, type SSEClientHandle } from "@/lib/sse-client";
+import type { ScoutMode, RepoResult, RepoVerification } from "@/lib/types";
 
 export function useScoutStream(searchId: string | null) {
   const [isConnected, setIsConnected] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   const [isLoadingSaved, setIsLoadingSaved] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const reconnectAttemptsRef = useRef(0);
-  const eventSourceRef = useRef<EventSource | null>(null);
+  const clientRef = useRef<SSEClientHandle | null>(null);
   const queryRef = useRef<string | null>(null);
-  const serverErrorReceivedRef = useRef(false);
 
   useEffect(() => {
     if (!searchId) {
@@ -76,125 +76,83 @@ export function useScoutStream(searchId: string | null) {
       setIsLoadingSaved(false);
       if (cancelled) return;
 
-      // Fall back to SSE stream
-      serverErrorReceivedRef.current = false;
-      const connect = () => {
-        const es = new EventSource(`/api/scout?id=${searchId}`);
-        eventSourceRef.current = es;
-
-        es.onopen = () => {
+      // Fall back to SSE stream using shared client
+      clientRef.current = createSSEClient({
+        url: `/api/scout?id=${searchId}`,
+        onOpen() {
           setIsConnected(true);
           setError(null);
-          reconnectAttemptsRef.current = 0;
-        };
-
-        es.addEventListener("mode_detected", (e) => {
-          const data = JSON.parse(e.data);
-          useScoutStore.getState().setMode(data.mode);
-          queryRef.current = data.topic || "";
-          useScoutStore.getState().setSearchMeta({
-            id: searchId,
-            query: data.topic || "",
-            mode: data.mode,
-            topic_extracted: data.topic || "",
-            searches_performed: 0,
-            repos_evaluated: 0,
-            repos_verified: 0,
-            created_at: new Date().toISOString(),
-          });
-        });
-
-        es.addEventListener("search_progress", (e) => {
-          const data = JSON.parse(e.data);
-          useScoutStore.getState().addSearchProgress(data);
-        });
-
-        es.addEventListener("repo_discovered", (e) => {
-          const data = JSON.parse(e.data);
-          useScoutStore.getState().addRepo(data);
-        });
-
-        es.addEventListener("verification_update", (e) => {
-          const data = JSON.parse(e.data);
-          useScoutStore.getState().updateRepoVerification(data.repo_url, data.verification);
-        });
-
-        es.addEventListener("observation", (e) => {
-          const data = JSON.parse(e.data);
-          useScoutStore.getState().addObservation(data.text);
-        });
-
-        es.addEventListener("curated_list", (e) => {
-          const data = JSON.parse(e.data);
-          useScoutStore.getState().addCuratedList(data);
-        });
-
-        es.addEventListener("industry_tool", (e) => {
-          const data = JSON.parse(e.data);
-          useScoutStore.getState().addIndustryTool(data);
-        });
-
-        es.addEventListener("search_error", (e) => {
-          const data = JSON.parse(e.data);
-          console.warn(`Search error (${data.strategy}): ${data.message}`);
-        });
-
-        // Listen for custom SSE error events from the server
-        es.addEventListener("error", (e) => {
-          // This handles the custom "error" SSE event (not the native EventSource error)
-          try {
-            const data = JSON.parse((e as MessageEvent).data);
-            // Mark that server sent an explicit error — prevent onerror reconnection
-            serverErrorReceivedRef.current = true;
-            if (data.recoverable) {
-              setError((data.message || "Something went wrong") + " — partial results shown below");
-              toast.warning("Search partially completed. Showing available results.");
-              useScoutStore.getState().setPhase1Complete(true);
-              useScoutStore.getState().setIsSearching(false);
-              setIsComplete(true);
-              es.close();
-            } else {
-              setError(data.message || "Search failed");
-              toast.error("Search failed. Please try again.");
-              es.close();
-            }
-          } catch {
-            // Not a JSON payload — might be a native EventSource error, handled by es.onerror
+        },
+        handlers: {
+          mode_detected(data: unknown) {
+            const d = data as Record<string, unknown>;
+            useScoutStore.getState().setMode(d.mode as ScoutMode);
+            queryRef.current = (d.topic as string) || "";
+            useScoutStore.getState().setSearchMeta({
+              id: searchId,
+              query: (d.topic as string) || "",
+              mode: d.mode as ScoutMode,
+              topic_extracted: (d.topic as string) || "",
+              searches_performed: 0,
+              repos_evaluated: 0,
+              repos_verified: 0,
+              created_at: new Date().toISOString(),
+            });
+          },
+          search_progress(data: unknown) {
+            useScoutStore.getState().addSearchProgress(data as { strategy: string; status: string; repos_found: number });
+          },
+          repo_discovered(data: unknown) {
+            useScoutStore.getState().addRepo(data as RepoResult);
+          },
+          verification_update(data: unknown) {
+            const d = data as Record<string, unknown>;
+            useScoutStore.getState().updateRepoVerification(d.repo_url as string, d.verification as Partial<RepoVerification>);
+          },
+          observation(data: unknown) {
+            const d = data as Record<string, unknown>;
+            useScoutStore.getState().addObservation(d.text as string);
+          },
+          curated_list(data: unknown) {
+            useScoutStore.getState().addCuratedList(data as { name: string; url: string; description: string });
+          },
+          industry_tool(data: unknown) {
+            useScoutStore.getState().addIndustryTool(data as { name: string; description: string; url?: string });
+          },
+          search_error(data: unknown) {
+            const d = data as Record<string, unknown>;
+            console.warn(`Search error (${d.strategy}): ${d.message}`);
+          },
+        },
+        onServerError(data) {
+          if (data.recoverable) {
+            setError((data.message || "Something went wrong") + " — partial results shown below");
+            toast.warning("Search partially completed. Showing available results.");
+            useScoutStore.getState().setPhase1Complete(true);
+            useScoutStore.getState().setIsSearching(false);
+            setIsComplete(true);
+          } else {
+            setError(data.message || "Search failed");
+            toast.error("Search failed. Please try again.");
           }
-        });
-
-        es.addEventListener("phase1_complete", () => {
+          return true; // close the stream
+        },
+        onComplete() {
           setIsComplete(true);
           useScoutStore.getState().setPhase1Complete(true);
           useScoutStore.getState().setIsSearching(false);
-          es.close();
-        });
-
-        es.onerror = () => {
-          // Don't reconnect if the server already sent an explicit error event
-          if (serverErrorReceivedRef.current) {
-            es.close();
-            return;
-          }
-          if (reconnectAttemptsRef.current < 3) {
-            reconnectAttemptsRef.current += 1;
-            es.close();
-            setTimeout(connect, 1000 * reconnectAttemptsRef.current);
-          } else {
-            es.close();
-            setError("Connection lost. Please refresh the page.");
-            toast.error("Connection lost. Check your internet and refresh the page.");
-            setIsConnected(false);
-          }
-        };
-      };
-
-      connect();
+        },
+        onConnectionLost() {
+          setError("Connection lost. Please refresh the page.");
+          toast.error("Connection lost. Check your internet and refresh the page.");
+          setIsConnected(false);
+        },
+      });
     })();
 
     return () => {
       cancelled = true;
-      eventSourceRef.current?.close();
+      clientRef.current?.close();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchId]);

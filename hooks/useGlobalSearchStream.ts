@@ -4,6 +4,8 @@ import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useSearchNotificationStore } from "@/stores/search-notification-store";
 import { useScoutStore } from "@/stores/scout-store";
+import { createSSEClient, type SSEClientHandle } from "@/lib/sse-client";
+import type { ScoutMode, RepoResult, RepoVerification } from "@/lib/types";
 
 /**
  * Global SSE listener that runs at the layout level.
@@ -11,10 +13,8 @@ import { useScoutStore } from "@/stores/scout-store";
  * the EventSource lifecycle outside React's effect cleanup cycle.
  */
 export function useGlobalSearchStream() {
-    const eventSourceRef = useRef<EventSource | null>(null);
-    const reconnectAttemptsRef = useRef(0);
+    const clientRef = useRef<SSEClientHandle | null>(null);
     const activeSearchIdRef = useRef<string | null>(null);
-    const serverErrorReceivedRef = useRef(false);
 
     useEffect(() => {
         const notifStore = useSearchNotificationStore;
@@ -22,123 +22,77 @@ export function useGlobalSearchStream() {
 
         function openSSE(searchId: string) {
             // Close any previous connection
-            eventSourceRef.current?.close();
+            clientRef.current?.close();
             activeSearchIdRef.current = searchId;
-            reconnectAttemptsRef.current = 0;
-            serverErrorReceivedRef.current = false;
 
-            const connect = () => {
-                // Bail if a different search has started since
-                if (activeSearchIdRef.current !== searchId) return;
-
-                const es = new EventSource(`/api/scout?id=${searchId}`);
-                eventSourceRef.current = es;
-
-                es.onopen = () => {
-                    notifStore.getState().setConnected();
-                    reconnectAttemptsRef.current = 0;
-                };
-
-                es.addEventListener("mode_detected", (e) => {
-                    const data = JSON.parse(e.data);
-                    scoutStore.getState().setMode(data.mode);
-                    scoutStore.getState().setSearchMeta({
-                        id: searchId,
-                        query: data.topic || "",
-                        mode: data.mode,
-                        topic_extracted: data.topic || "",
-                        searches_performed: 0,
-                        repos_evaluated: 0,
-                        repos_verified: 0,
-                        created_at: new Date().toISOString(),
-                    });
-                });
-
-                es.addEventListener("search_progress", (e) => {
-                    const data = JSON.parse(e.data);
-                    notifStore.getState().updateProgress(data);
-                    scoutStore.getState().addSearchProgress(data);
-                });
-
-                es.addEventListener("repo_discovered", (e) => {
-                    const data = JSON.parse(e.data);
-                    scoutStore.getState().addRepo(data);
-                    notifStore.getState().incrementRepos();
-                });
-
-                es.addEventListener("verification_update", (e) => {
-                    const data = JSON.parse(e.data);
-                    scoutStore.getState().updateRepoVerification(data.repo_url, data.verification);
-                });
-
-                es.addEventListener("observation", (e) => {
-                    const data = JSON.parse(e.data);
-                    scoutStore.getState().addObservation(data.text);
-                });
-
-                es.addEventListener("curated_list", (e) => {
-                    const data = JSON.parse(e.data);
-                    scoutStore.getState().addCuratedList(data);
-                });
-
-                es.addEventListener("industry_tool", (e) => {
-                    const data = JSON.parse(e.data);
-                    scoutStore.getState().addIndustryTool(data);
-                });
-
-                es.addEventListener("search_error", (e) => {
-                    const data = JSON.parse(e.data);
-                    console.warn(`[GlobalSearch] Search error (${data.strategy}): ${data.message}`);
-                });
-
-                // Custom SSE "error" event from server
-                es.addEventListener("error", (e) => {
-                    try {
-                        const data = JSON.parse((e as MessageEvent).data);
-                        // Mark that server sent an explicit error — prevent onerror reconnection
-                        serverErrorReceivedRef.current = true;
-                        if (data.recoverable) {
-                            toast.warning("Search partially completed. Showing available results.");
-                            notifStore.getState().setComplete();
-                            scoutStore.getState().setPhase1Complete(true);
-                            scoutStore.getState().setIsSearching(false);
-                            es.close();
-                        } else {
-                            notifStore.getState().setError(data.message || "Search failed");
-                            toast.error("Search failed. Please try again.");
-                            es.close();
-                        }
-                    } catch {
-                        // Native EventSource error, handled by es.onerror
+            clientRef.current = createSSEClient({
+                url: `/api/scout?id=${searchId}`,
+                onOpen: () => notifStore.getState().setConnected(),
+                handlers: {
+                    mode_detected(data: unknown) {
+                        const d = data as Record<string, unknown>;
+                        scoutStore.getState().setMode(d.mode as ScoutMode);
+                        scoutStore.getState().setSearchMeta({
+                            id: searchId,
+                            query: (d.topic as string) || "",
+                            mode: d.mode as ScoutMode,
+                            topic_extracted: (d.topic as string) || "",
+                            searches_performed: 0,
+                            repos_evaluated: 0,
+                            repos_verified: 0,
+                            created_at: new Date().toISOString(),
+                        });
+                    },
+                    search_progress(data: unknown) {
+                        const d = data as { strategy: string; status: string; repos_found: number };
+                        notifStore.getState().updateProgress(d);
+                        scoutStore.getState().addSearchProgress(d);
+                    },
+                    repo_discovered(data: unknown) {
+                        scoutStore.getState().addRepo(data as RepoResult);
+                        notifStore.getState().incrementRepos();
+                    },
+                    verification_update(data: unknown) {
+                        const d = data as Record<string, unknown>;
+                        scoutStore.getState().updateRepoVerification(d.repo_url as string, d.verification as Partial<RepoVerification>);
+                    },
+                    observation(data: unknown) {
+                        const d = data as Record<string, unknown>;
+                        scoutStore.getState().addObservation(d.text as string);
+                    },
+                    curated_list(data: unknown) {
+                        scoutStore.getState().addCuratedList(data as { name: string; url: string; description: string });
+                    },
+                    industry_tool(data: unknown) {
+                        scoutStore.getState().addIndustryTool(data as { name: string; description: string; url?: string });
+                    },
+                    search_error(data: unknown) {
+                        const d = data as Record<string, unknown>;
+                        console.warn(`[GlobalSearch] Search error (${d.strategy}): ${d.message}`);
+                    },
+                },
+                onServerError(data) {
+                    if (data.recoverable) {
+                        toast.warning("Search partially completed. Showing available results.");
+                        notifStore.getState().setComplete();
+                        scoutStore.getState().setPhase1Complete(true);
+                        scoutStore.getState().setIsSearching(false);
+                    } else {
+                        notifStore.getState().setError(data.message || "Search failed");
+                        toast.error("Search failed. Please try again.");
                     }
-                });
-
-                es.addEventListener("phase1_complete", () => {
+                    return true; // close the stream
+                },
+                onComplete() {
                     notifStore.getState().setComplete();
                     scoutStore.getState().setPhase1Complete(true);
                     scoutStore.getState().setIsSearching(false);
-                    es.close();
-                });
-
-                es.onerror = () => {
-                    // Don't reconnect if the server already sent an explicit error event
-                    if (serverErrorReceivedRef.current) {
-                        es.close();
-                        return;
-                    }
-                    if (reconnectAttemptsRef.current < 3) {
-                        reconnectAttemptsRef.current += 1;
-                        es.close();
-                        setTimeout(connect, 1000 * reconnectAttemptsRef.current);
-                    } else {
-                        es.close();
-                        notifStore.getState().setError("Connection lost. Please try again.");
-                        toast.error("Connection lost. Check your internet and try again.");
-                    }
-                };
-            };
-
-            connect();
+                },
+                onConnectionLost() {
+                    notifStore.getState().setError("Connection lost. Please try again.");
+                    toast.error("Connection lost. Check your internet and try again.");
+                },
+            });
         }
 
         // Subscribe to store changes: when a new search starts (status becomes "connecting"),
@@ -155,7 +109,6 @@ export function useGlobalSearchStream() {
         });
 
         // Also handle the case where status is already "connecting" on mount
-        // (e.g., if the component mounts after startSearch was called)
         const current = notifStore.getState();
         if (
             current.status === "connecting" &&
@@ -167,10 +120,8 @@ export function useGlobalSearchStream() {
 
         return () => {
             unsub();
-            eventSourceRef.current?.close();
+            clientRef.current?.close();
             activeSearchIdRef.current = null;
         };
     }, []); // Empty deps — runs once, manages lifecycle via subscribe
 }
-
-

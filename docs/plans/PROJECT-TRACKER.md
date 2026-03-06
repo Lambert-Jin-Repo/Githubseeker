@@ -212,6 +212,46 @@
 
 ---
 
+## Phase 11: Code Quality Refactoring (COMPLETE — 4 phases, 0 behavioral changes)
+
+**Date:** 2026-03-06
+**Review:** `code_quality_review.md` (full audit: architecture, duplication, error handling, modularity)
+**Plan:** `implementation_plan.md`
+**Type:** Pure refactoring — no runtime behavior changes, all 269 tests pass unmodified
+
+### Phase 1: Quick Wins
+| # | Task | Status | Files |
+|---|---|---|---|
+| 1 | Safe JSON.parse — try/catch on all SSE event handlers (16 calls) | `done` | `hooks/useGlobalSearchStream.ts`, `hooks/useScoutStream.ts` |
+| 2 | Remove in-memory `pendingSearches` Map — always use Supabase | `done` | `app/api/scout/route.ts` |
+| 3 | Delete orphan `proxy.ts` (unreferenced middleware duplicate) | `done` | `proxy.ts` (deleted) |
+| 4 | Delete unused V1 deep-dive hook | `done` | `hooks/useDeepDiveStream.ts` (deleted) |
+
+### Phase 2: SSE Client Consolidation
+| # | Task | Status | Files |
+|---|---|---|---|
+| 1 | Create shared SSE client helper (reconnection, safe parse, error detection) | `done` | `lib/sse-client.ts` (new) |
+| 2 | Refactor `useGlobalSearchStream` to use shared SSE client | `done` | `hooks/useGlobalSearchStream.ts` (193→128 lines) |
+| 3 | Refactor `useScoutStream` to use shared SSE client | `done` | `hooks/useScoutStream.ts` (241→178 lines) |
+
+### Phase 3: Deep-Dive Analyzer Module Split
+| # | Task | Status | Files |
+|---|---|---|---|
+| 1 | Extract parsers (13 functions + summary parser) | `done` | `lib/deep-dive/parsers.ts` (new, ~280 lines) |
+| 2 | Extract prompt builders (5 group prompts + summary) | `done` | `lib/deep-dive/prompts.ts` (new, ~240 lines) |
+| 3 | Extract agent ecosystem search + constants | `done` | `lib/deep-dive/ecosystem.ts` (new, ~120 lines) |
+| 4 | Slim orchestrator with re-exports for backward compat | `done` | `lib/deep-dive-analyzer-v2.ts` (777→210 lines) |
+
+### Phase 4: API Route Decomposition
+| # | Task | Status | Files |
+|---|---|---|---|
+| 1 | Extract result parsing + prompt builders | `done` | `lib/scout/result-parser.ts` (new, ~160 lines) |
+| 2 | Slim route handler to HTTP orchestration only | `done` | `app/api/scout/route.ts` (568→424 lines) |
+
+**Impact:** ~600 lines of duplication eliminated, 5 new focused modules, 2 dead files removed, 0 tests modified
+
+---
+
 ## Tech Stack Summary
 
 | Layer | Technology |
@@ -222,7 +262,7 @@
 | Search | Serper API (Google Search) at `google.serper.dev/search` |
 | Database | Supabase (project: `fnylozxqgmnzvdbshzvn`, region: ap-southeast-1, free plan) |
 | State | Zustand |
-| Testing | Vitest (206 tests, 18 files) |
+| Testing | Vitest (269 tests, 22 files) |
 | Fonts | Literata (headings), Atkinson Hyperlegible Next (body), JetBrains Mono (code) |
 
 ### Phase 10 Commits
@@ -247,15 +287,19 @@
 | `lib/text-utils.ts` | `extractJSON` shared utility (Phase 10 D2) |
 | `lib/persistence.ts` | `persistDeepDive` shared utility (Phase 10 D4) |
 | `lib/sse-parser.ts` | `parseSSEEvents` shared utility (Phase 10 D5) |
+| `lib/sse-client.ts` | Shared EventSource helper — reconnection, safe parse, error detection (Phase 11) |
+| `lib/deep-dive/parsers.ts` | All deep-dive parser functions — shared V1/V2 (Phase 11) |
+| `lib/deep-dive/prompts.ts` | LLM prompt builders for deep-dive analysis groups (Phase 11) |
+| `lib/deep-dive/ecosystem.ts` | Agent ecosystem batch search via Serper (Phase 11) |
+| `lib/scout/result-parser.ts` | Scout route prompt builders + repo result parser (Phase 11) |
 | `app/api/scout/route.ts` | Phase 1 POST (create search) + GET (SSE stream) |
 | `app/api/scout/[id]/deep-dive/route.ts` | Phase 2 deep dive SSE stream (V1) |
 | `app/api/scout/[id]/deep-dive-v2/route.ts` | Phase 2 deep dive SSE stream (V2) |
 | `app/api/scout/[id]/results/route.ts` | Load saved search results |
 | `app/api/feedback/route.ts` | Persist feedback |
 | `app/api/history/route.ts` | Query search history |
-| `hooks/useScoutStream.ts` | Phase 1 SSE consumer (checks DB first) |
-| `hooks/useGlobalSearchStream.ts` | Global SSE listener (layout-level, Zustand subscribe) |
-| `hooks/useDeepDiveStream.ts` | Phase 2 SSE consumer (V1) |
+| `hooks/useScoutStream.ts` | Phase 1 SSE consumer (checks DB first, uses shared SSE client) |
+| `hooks/useGlobalSearchStream.ts` | Global SSE listener (layout-level, uses shared SSE client) |
 | `hooks/useDeepDiveStreamV2.ts` | Phase 2 SSE consumer (V2) |
 | `stores/scout-store.ts` | Full Zustand store |
 | `stores/search-notification-store.ts` | Global search notification state |
