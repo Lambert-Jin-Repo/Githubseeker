@@ -1,0 +1,26 @@
+name: Keep Supabase Alive
+
+on:
+  schedule:
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query Supabase to prevent pausing
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            "${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}/rest/v1/" \
+            -H "apikey: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}")
+
+          echo "HTTP response code: $response"
+
+          if [[ "$response" -ge 200 && "$response" -lt 300 ]]; then
+            echo "Supabase is alive and responding."
+          else
+            echo "::error::Supabase returned HTTP $response"
+            exit 1
+          fi
